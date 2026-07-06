@@ -152,6 +152,8 @@
   .sheet-head{padding:6px 18px 12px; border-bottom:1px solid var(--line-soft);}
   .sheet-head .name{font-size:18px; font-weight:800;}
   .sheet-head .meta{font-size:12.5px; color:var(--txt-dim); margin-top:3px;}
+  .code-btn{display:inline-flex; align-items:center; gap:5px; margin-top:6px; background:var(--surface-2); border:1px solid var(--line); border-radius:8px; padding:5px 10px; font-size:12px; font-weight:700; color:var(--txt-dim); cursor:pointer; font-family:'JetBrains Mono',monospace; letter-spacing:.3px;}
+  .code-btn:active{background:var(--blue); color:#fff; border-color:var(--blue);}
   .sheet-body{overflow-y:auto; padding:16px 18px 28px; -webkit-overflow-scrolling:touch;}
 
   .seg{display:flex; background:var(--surface); border-radius:var(--r-sm); padding:4px; gap:4px; margin-bottom:18px;}
@@ -383,7 +385,7 @@
       <p>입력한 일정·보고 내용을 모두 지웁니다. (API 키는 유지)</p>
       <button class="btn btn-ghost btn-block" onclick="wipeData()">전체 일정 삭제</button>
     </div>
-    <div style="text-align:center; color:var(--txt-faint); font-size:11px; padding:6px 0 10px;" class="mono">ploom-report · build 0621</div>
+    <div style="text-align:center; color:var(--txt-faint); font-size:11px; padding:6px 0 10px;" class="mono">ploom-report · build 0621b</div>
   </main>
 </section>
 
@@ -394,6 +396,7 @@
   <div class="sheet-head">
     <div class="name" id="edName">—</div>
     <div class="meta" id="edMeta">—</div>
+    <button class="code-btn" id="codeBtn" style="display:none;" onclick="copyStoreCode()"><span id="codeBtnText">—</span> 탭하여 복사</button>
   </div>
   <div class="sheet-body">
     <div class="seg" id="modeSeg">
@@ -784,7 +787,8 @@ function mapExcelRows(sheets){
       team:header.indexOf('팀'), round:header.indexOf('세일즈 진행 일차'),
       date:header.indexOf('날짜'), dow:header.indexOf('요일'),
       type:header.indexOf('점포/흡연구역'), brand:header.indexOf('점포 타입'),
-      store:header.indexOf('점포명'), addr:header.indexOf('주소')
+      store:header.indexOf('점포명'), addr:header.indexOf('주소'),
+      code:header.indexOf('점포코드')
     };
     const isNewFormat = hi.team>=0 && hi.store>=0 && hi.type>=0 && hi.brand>=0 && hi.date>=0;
 
@@ -810,6 +814,7 @@ function mapExcelRows(sheets){
           addr:hi.addr>=0?(row[hi.addr]==null?'':String(row[hi.addr]).trim()):'',
           brand:normBrand(row[hi.brand]==null?'':String(row[hi.brand]).trim()),
           round:hi.round>=0?(row[hi.round]==null?'':String(row[hi.round]).trim()).replace('일차',''):'',
+          storeCode:hi.code>=0?(row[hi.code]==null?'':String(row[hi.code]).trim()):'',
           group:groupVal, report:(DATA[id]&&DATA[id].report)?DATA[id].report:null
         };
         n++;
@@ -1011,6 +1016,9 @@ function openSheet(id, defMode){
   r.stock=normStock(r.stock);
   document.getElementById('edName').textContent=v.store;
   document.getElementById('edMeta').textContent=`${v.team} · ${v.brand} · ${v.type} · ${v.dateKey} ${v.dow}`;
+  const cb=document.getElementById('codeBtn'), ct=document.getElementById('codeBtnText');
+  if(v.storeCode){ cb.style.display='inline-flex'; ct.textContent=v.storeCode; }
+  else cb.style.display='none';
   document.querySelectorAll('#stockOpts .opt').forEach(o=>{ o.onclick=()=>toggleStock(o.dataset.stock); });
   renderStockOpts();
   document.getElementById('respiField').style.display = 'block';
@@ -1375,6 +1383,12 @@ function saveLinkCode(){
   setTimeout(()=>location.reload(), 900);  // Firebase 재연결 위해 새로고침
 }
 function getVisitorName(){ return localStorage.getItem('ploomVisitor') || 'SV 김건하'; }
+async function copyStoreCode(){
+  const v=DATA[curId]; if(!v||!v.storeCode) return;
+  try{ await navigator.clipboard.writeText(v.storeCode); }
+  catch(e){ const ta=document.createElement('textarea'); ta.value=v.storeCode; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); }
+  toast('점포코드 복사됨 · '+v.storeCode);
+}
 function saveVisitor(){
   const v=(document.getElementById('visitorInput').value||'').trim();
   localStorage.setItem('ploomVisitor', v || 'SV 김건하');
