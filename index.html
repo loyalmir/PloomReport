@@ -6,17 +6,9 @@
 <meta name="theme-color" content="#0E1525" />
 <title>Ploom 현장 보고</title>
 
-<!-- Firebase config (ploom-sync 프로젝트) -->
+<!-- Firebase config — 코드에 넣지 않음. 설정 탭에서 입력 → 폰에만 저장 -->
 <script>
-  const FIREBASE_CONFIG = {
-    apiKey: "AIzaSyAI9nYB_bP1Hh86DsCAd4MOh1iVHC9RUTA",
-    authDomain: "ploom-sync.firebaseapp.com",
-    databaseURL: "https://ploom-sync-default-rtdb.firebaseio.com",
-    projectId: "ploom-sync",
-    storageBucket: "ploom-sync.firebasestorage.app",
-    messagingSenderId: "899333631787",
-    appId: "1:899333631787:web:66920e501aef3eaa535f6e"
-  };
+  const FIREBASE_CONFIG = null;  // 설정 탭에서 동적으로 로드
 </script>
 
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
@@ -374,6 +366,13 @@
       <div class="hint">키 발급: console.anthropic.com → API Keys → Create Key. 처음에 5~10달러만 충전하면 한참 씁니다.</div>
     </div>
     <div class="panel">
+      <h3>Firebase 설정 (기기 동기화용)</h3>
+      <p>Firebase 콘솔 → 프로젝트 설정 → 내 앱 → firebaseConfig 코드를 아래에 붙여넣으세요. 이 기기에만 저장되고 GitHub에는 올라가지 않습니다.</p>
+      <textarea id="fbConfigInput" placeholder='firebaseConfig 코드를 여기에 붙여넣기…&#10;예) const firebaseConfig = { apiKey: "...", ... }' style="min-height:100px; font-size:12px;" class="mono"></textarea>
+      <button class="btn btn-primary btn-block" onclick="saveFirebaseConfig()" style="margin-top:10px;">저장</button>
+      <div class="hint" id="fbConfigMsg"></div>
+    </div>
+    <div class="panel">
       <h3>기기 동기화 — 링크 코드</h3>
       <p>폰과 아이패드에 같은 코드를 입력하면 일정·재고·기록이 실시간으로 연결됩니다. 코드는 영문+숫자 조합으로 원하는 걸 쓰면 돼요. (사진은 용량이 커서 각 기기에 따로 저장됩니다.)</p>
       <div class="row" style="gap:9px;">
@@ -394,7 +393,7 @@
       <p>입력한 일정·보고 내용을 모두 지웁니다. (API 키는 유지)</p>
       <button class="btn btn-ghost btn-block" onclick="wipeData()">전체 일정 삭제</button>
     </div>
-    <div style="text-align:center; color:var(--txt-faint); font-size:11px; padding:6px 0 10px;" class="mono">ploom-report · build 0622</div>
+    <div style="text-align:center; color:var(--txt-faint); font-size:11px; padding:6px 0 10px;" class="mono">ploom-report · build 0622b</div>
   </main>
 </section>
 
@@ -601,10 +600,12 @@ const Store = {
   path(key){ return `ploomSync/${this.linkCode}/${key}`; },
   async init(){
     const code=(localStorage.getItem('ploomLinkCode')||'').trim().toUpperCase();
-    if(code && FIREBASE_CONFIG && FIREBASE_CONFIG.databaseURL){
+    let fbConfig=null;
+    try{ fbConfig=JSON.parse(localStorage.getItem('ploomFirebaseConfig')||'null'); }catch(e){}
+    if(code && fbConfig && fbConfig.databaseURL){
       this.linkCode=code;
       try{
-        if(!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
+        if(!firebase.apps.length) firebase.initializeApp(fbConfig);
         this.db=firebase.database(); this.mode='cloud';
         // Firebase가 비어있으면 로컬 데이터를 먼저 올림 (데이터 손실 방지)
         const snap = await this.db.ref(this.path('visits')).once('value');
@@ -1383,6 +1384,33 @@ async function analyzePhotos(){
 }
 
 /* ═══════════ 설정 ═══════════ */
+function saveFirebaseConfig(){
+  const raw=(document.getElementById('fbConfigInput').value||'').trim();
+  const msg=document.getElementById('fbConfigMsg');
+  // firebaseConfig 객체를 텍스트에서 추출
+  let cfg=null;
+  try{
+    // JSON 형태로 직접 붙여넣은 경우
+    cfg=JSON.parse(raw);
+  }catch(e){
+    // const firebaseConfig = {...} 형태인 경우 — 객체 부분만 추출
+    const m=raw.match(/\{[\s\S]*\}/);
+    if(m){
+      try{
+        // JSON 파싱을 위해 키를 따옴표로 감싸기
+        const jsonStr=m[0].replace(/(['"])?([a-zA-Z0-9_]+)(['"])?:/g,'"$2":').replace(/,\s*}/g,'}');
+        cfg=JSON.parse(jsonStr);
+      }catch(e2){}
+    }
+  }
+  if(!cfg||!cfg.databaseURL||!cfg.apiKey){
+    msg.innerHTML='<span class="warn">설정을 읽지 못했어요. firebaseConfig 코드 전체를 복사해서 넣어주세요.</span>';
+    return;
+  }
+  localStorage.setItem('ploomFirebaseConfig', JSON.stringify(cfg));
+  msg.innerHTML='<span class="ok">저장됨 · 연결 버튼을 눌러 동기화를 시작하세요.</span>';
+  toast('Firebase 설정 저장됨');
+}
 function saveLinkCode(){
   const code=(document.getElementById('linkCodeInput').value||'').trim().toUpperCase();
   localStorage.setItem('ploomLinkCode', code);
@@ -1529,6 +1557,8 @@ window.addEventListener('DOMContentLoaded',()=>{
   const k=localStorage.getItem('ploomApiKey'); if(k) document.getElementById('apiKey').value=k;
   const m=localStorage.getItem('ploomModel'); if(m) document.getElementById('modelSel').value=m;
   const lc=localStorage.getItem('ploomLinkCode'); if(lc) document.getElementById('linkCodeInput').value=lc;
+  const fc=localStorage.getItem('ploomFirebaseConfig');
+  if(fc){ try{ const cfg=JSON.parse(fc); document.getElementById('fbConfigInput').value=JSON.stringify(cfg,null,2); }catch(e){} }
   document.getElementById('visitorInput').value=getVisitorName();
   // 마감재고 팀·이름 초기값
   const it=document.getElementById('invTeam'); if(it) it.value=localStorage.getItem('ploomTeamName')||'';
