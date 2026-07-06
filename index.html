@@ -345,7 +345,7 @@
       <p>입력한 일정·보고 내용을 모두 지웁니다. (API 키는 유지)</p>
       <button class="btn btn-ghost btn-block" onclick="wipeData()">전체 일정 삭제</button>
     </div>
-    <div style="text-align:center; color:var(--txt-faint); font-size:11px; padding:6px 0 10px;" class="mono">ploom-report · build 0620</div>
+    <div style="text-align:center; color:var(--txt-faint); font-size:11px; padding:6px 0 10px;" class="mono">ploom-report · build 0620b</div>
   </main>
 </section>
 
@@ -426,8 +426,14 @@
         <textarea id="purchaseNote" placeholder="구매 내용 적어주세요." oninput="render()"></textarea>
       </div>
       <div class="field">
-        <label>특이사항</label>
-        <textarea id="eventMemo" placeholder="예) 동의서 작성 완료" oninput="render()"></textarea>
+        <label>동의서</label>
+        <div class="opts">
+          <span class="opt yes" id="consentYes" onclick="setConsent(true)">작성 완료</span>
+        </div>
+      </div>
+      <div class="field">
+        <label>특이사항 <span style="color:var(--txt-faint); font-weight:500;">(선택)</span></label>
+        <textarea id="eventMemo" placeholder="직접 입력해주세요." oninput="render()"></textarea>
       </div>
     </div>
 
@@ -951,13 +957,14 @@ function esc(s){ return (s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>'
 /* ═══════════ 편집 시트 ═══════════ */
 function openSheet(id, defMode){
   curId=id; const v=DATA[id]; if(!v) return;
-  if(!v.report) v.report={stock:{}, respiTarget:'점주', env:'', merit:null, refill:null, stand:null, purchase:null, purchaseNote:'', eventMemo:'', dayMemo:'', status:''};
+  if(!v.report) v.report={stock:{}, respiTarget:'점주', env:'', merit:null, refill:null, stand:null, purchase:null, purchaseNote:'', consent:false, eventMemo:'', dayMemo:'', status:''};
   const r=v.report;
   if(r.respiTarget===undefined) r.respiTarget='점주';
   if(r.refill===undefined) r.refill=null;
   if(r.stand===undefined) r.stand=null;
   if(r.purchase===undefined) r.purchase=null;
   if(r.purchaseNote===undefined) r.purchaseNote='';
+  if(r.consent===undefined) r.consent=false;
   if(r.eventMemo===undefined) r.eventMemo='';
   r.stock=normStock(r.stock);
   document.getElementById('edName').textContent=v.store;
@@ -971,7 +978,7 @@ function openSheet(id, defMode){
   document.getElementById('dayMemo').value=r.dayMemo||'';
   document.getElementById('purchaseNote').value=r.purchaseNote||'';
   document.getElementById('eventMemo').value=r.eventMemo||'';
-  setRefillUI(r.refill); setStandUI(r.stand); setPurchaseUI(r.purchase);
+  setRefillUI(r.refill); setStandUI(r.stand); setPurchaseUI(r.purchase); setConsentUI(r.consent||false);
   showHistHint(v,r);
   const autoMode = (dayReportOn && defMode==='day')?'day': defMode==='event'?'event':'pre';
   setMode(autoMode);
@@ -1061,6 +1068,10 @@ function setPurchaseUI(v){
   document.getElementById('purchaseX').classList.toggle('on', v===false);
   document.getElementById('purchaseNoteField').style.display = (v===true)?'block':'none';
 }
+function setConsent(v){ const r=DATA[curId].report; r.consent=(r.consent===v)?false:v; setConsentUI(r.consent); render(); }
+function setConsentUI(v){
+  document.getElementById('consentYes').classList.toggle('on', !!v);
+}
 function setRespi(who){ const r=DATA[curId].report; r.respiTarget = (r.respiTarget===who)?null:who; updateRespiUI(r.respiTarget); render(); }
 function updateRespiUI(who){
   document.getElementById('respiOwner').classList.toggle('on', who==='점주');
@@ -1126,7 +1137,8 @@ function reportText(){
     lines.push(`구매 : ${purchaseVal}`);
     if(r.purchase===true && r.purchaseNote && r.purchaseNote.trim())
       lines.push(`_ 구매 내용 : ${r.purchaseNote.trim()}`);
-    lines.push(`특이사항 : ${(r.eventMemo&&r.eventMemo.trim())?r.eventMemo.trim():''}`);
+    if(r.consent) lines.push(`동의서 작성 완료`);
+    if(r.eventMemo && r.eventMemo.trim()) lines.push(`특이사항 : ${r.eventMemo.trim()}`);
     return lines.join('\n').replace(/\s+$/,'');
   }
   // 사전방문 — 체크리스트 양식
@@ -1153,6 +1165,7 @@ function render(){
   r.dayMemo=document.getElementById('dayMemo').value;
   r.purchaseNote=document.getElementById('purchaseNote').value;
   r.eventMemo=document.getElementById('eventMemo').value;
+  // consent는 버튼 클릭으로만 바뀌므로 render에서 읽지 않음
   const t=reportText();
   document.getElementById('preview').textContent= t || '—';
 }
