@@ -92,6 +92,7 @@
   .card.s-pre .stripe{background:var(--amber);}
   .card.s-day .stripe{background:var(--green);}
   .card.s-draft .stripe{background:var(--blue);}
+  .card.s-event .stripe{background:var(--coral);}
   .card-top{display:flex; align-items:baseline; gap:8px; margin-bottom:5px;}
   .card .round{font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--txt-faint); font-weight:700;}
   .card .name{font-size:16px; font-weight:800; letter-spacing:-.3px;}
@@ -105,6 +106,7 @@
   .status-pill.pre{background:rgba(255,194,75,.16); color:var(--amber);}
   .status-pill.day{background:rgba(56,211,159,.16); color:var(--green);}
   .status-pill.draft{background:rgba(74,140,255,.16); color:var(--blue);}
+  .status-pill.event{background:rgba(255,107,92,.16); color:var(--coral);}
 
   .empty{text-align:center; padding:50px 20px; color:var(--txt-faint);}
   .empty b{display:block; color:var(--txt-dim); font-size:15px; margin-bottom:6px;}
@@ -343,7 +345,7 @@
       <p>입력한 일정·보고 내용을 모두 지웁니다. (API 키는 유지)</p>
       <button class="btn btn-ghost btn-block" onclick="wipeData()">전체 일정 삭제</button>
     </div>
-    <div style="text-align:center; color:var(--txt-faint); font-size:11px; padding:6px 0 10px;" class="mono">ploom-report · build 0619d</div>
+    <div style="text-align:center; color:var(--txt-faint); font-size:11px; padding:6px 0 10px;" class="mono">ploom-report · build 0620</div>
   </main>
 </section>
 
@@ -359,6 +361,7 @@
     <div class="seg" id="modeSeg">
       <button id="segPre" class="on" onclick="setMode('pre')">사전방문</button>
       <button id="segDay" onclick="setMode('day')">당일</button>
+      <button id="segEvent" onclick="setMode('event')">행사당일</button>
     </div>
 
     <div id="preFields">
@@ -407,6 +410,24 @@
       <div class="field">
         <label>메모 <span style="color:var(--txt-faint); font-weight:500;">(선택)</span></label>
         <textarea id="dayMemo" placeholder="특이사항 있으면 한 줄. 없으면 비워두세요." oninput="render()"></textarea>
+      </div>
+    </div>
+
+    <div id="eventFields" style="display:none;">
+      <div class="field">
+        <label>구매 <span style="color:var(--txt-faint); font-weight:500;">(다시 누르면 해제)</span></label>
+        <div class="opts">
+          <span class="opt yes" id="purchaseO" onclick="setPurchase(true)">O</span>
+          <span class="opt no" id="purchaseX" onclick="setPurchase(false)">X</span>
+        </div>
+      </div>
+      <div class="field" id="purchaseNoteField" style="display:none;">
+        <label>구매 내용</label>
+        <textarea id="purchaseNote" placeholder="구매 내용 적어주세요." oninput="render()"></textarea>
+      </div>
+      <div class="field">
+        <label>특이사항</label>
+        <textarea id="eventMemo" placeholder="예) 동의서 작성 완료" oninput="render()"></textarea>
       </div>
     </div>
 
@@ -891,8 +912,8 @@ function renderStoreList(){
 function card(v, defMode){
   defMode = defMode || 'pre';
   const st=statusOf(v);
-  const cls= st==='사전완료'?'s-pre': st==='당일완료'?'s-day': st==='작성중'?'s-draft':'';
-  const pill= st==='사전완료'?'<span class="status-pill pre">사전완료</span>': st==='당일완료'?'<span class="status-pill day">당일완료</span>': st==='작성중'?'<span class="status-pill draft">작성중</span>':'';
+  const cls= st==='사전완료'?'s-pre': st==='당일완료'?'s-day': st==='작성중'?'s-draft': st==='행사완료'?'s-event':'';
+  const pill= st==='사전완료'?'<span class="status-pill pre">사전완료</span>': st==='당일완료'?'<span class="status-pill day">당일완료</span>': st==='작성중'?'<span class="status-pill draft">작성중</span>': st==='행사완료'?'<span class="status-pill event">행사완료</span>':'';
   const naver= v.addr? `<a href="https://map.naver.com/p/search/${encodeURIComponent(v.addr)}" target="_blank" onclick="event.stopPropagation()">길찾기 ›</a>`:'';
   return `<div class="card ${cls}" onclick="openSheet('${v.id}','${defMode}')">
     <div class="stripe"></div>${pill}
@@ -930,26 +951,30 @@ function esc(s){ return (s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>'
 /* ═══════════ 편집 시트 ═══════════ */
 function openSheet(id, defMode){
   curId=id; const v=DATA[id]; if(!v) return;
-  if(!v.report) v.report={stock:{}, respiTarget:'점주', env:'', merit:null, refill:null, stand:null, dayMemo:'', status:''};
+  if(!v.report) v.report={stock:{}, respiTarget:'점주', env:'', merit:null, refill:null, stand:null, purchase:null, purchaseNote:'', eventMemo:'', dayMemo:'', status:''};
   const r=v.report;
-  if(r.respiTarget===undefined) r.respiTarget='점주';   // 최초만 기본 점주, 끈 상태(null)는 유지
+  if(r.respiTarget===undefined) r.respiTarget='점주';
   if(r.refill===undefined) r.refill=null;
   if(r.stand===undefined) r.stand=null;
+  if(r.purchase===undefined) r.purchase=null;
+  if(r.purchaseNote===undefined) r.purchaseNote='';
+  if(r.eventMemo===undefined) r.eventMemo='';
   r.stock=normStock(r.stock);
   document.getElementById('edName').textContent=v.store;
   document.getElementById('edMeta').textContent=`${v.team} · ${v.brand} · ${v.type} · ${v.dateKey} ${v.dow}`;
-  // 재고
   document.querySelectorAll('#stockOpts .opt').forEach(o=>{ o.onclick=()=>toggleStock(o.dataset.stock); });
   renderStockOpts();
-  // 리스피·진열장: 점포만 노출
   document.getElementById('respiField').style.display = 'block';
   document.getElementById('standField').style.display = 'block';
   updateRespiUI(r.respiTarget);
   document.getElementById('envText').value=r.env||'';
   document.getElementById('dayMemo').value=r.dayMemo||'';
-  setRefillUI(r.refill); setStandUI(r.stand);
+  document.getElementById('purchaseNote').value=r.purchaseNote||'';
+  document.getElementById('eventMemo').value=r.eventMemo||'';
+  setRefillUI(r.refill); setStandUI(r.stand); setPurchaseUI(r.purchase);
   showHistHint(v,r);
-  setMode((dayReportOn && defMode==='day')?'day':'pre');
+  const autoMode = (dayReportOn && defMode==='day')?'day': defMode==='event'?'event':'pre';
+  setMode(autoMode);
   document.getElementById('sheetBg').classList.add('open');
   document.getElementById('sheet').classList.add('open');
   render();
@@ -975,16 +1000,17 @@ function setMode(m){
   curMode=m;
   document.getElementById('segPre').classList.toggle('on',m==='pre');
   document.getElementById('segDay').classList.toggle('on',m==='day');
+  document.getElementById('segEvent').classList.toggle('on',m==='event');
+  document.getElementById('segDay').style.display = dayReportOn?'':'none';
   document.getElementById('preFields').style.display = m==='pre'?'block':'none';
   document.getElementById('dayFields').style.display = m==='day'?'block':'none';
-  document.getElementById('analyzeBtn').style.display = m==='pre'?'flex':'none';
-  // 사전/당일 사진 따로 보관 → 모드에 맞는 사진 로드
-  // 사전/당일 사진 따로 보관 → 모드에 맞는 사진 비동기 로드
+  document.getElementById('eventFields').style.display = m==='event'?'block':'none';
+  document.getElementById('analyzeBtn').style.display = (m==='pre'||m==='event')?'flex':'none';
   revokeObjUrls(); photos=[]; renderPhotos();
   if(curId){ const id=curId, mm=m;
     Photos.get(photoKey(id,mm)).then(items=>{
       if(curId!==id || curMode!==mm) return;
-      photos=items;  // [{objectUrl, blob}]
+      photos=items;
       renderPhotos();
     });
   }
@@ -1028,6 +1054,12 @@ function setStand(v){ const r=DATA[curId].report; r.stand = (r.stand===v)?null:v
 function setStandUI(v){
   document.getElementById('standYes').classList.toggle('on', v===true);
   document.getElementById('standNo').classList.toggle('on', v===false);
+}
+function setPurchase(v){ const r=DATA[curId].report; r.purchase=(r.purchase===v)?null:v; setPurchaseUI(r.purchase); render(); }
+function setPurchaseUI(v){
+  document.getElementById('purchaseO').classList.toggle('on', v===true);
+  document.getElementById('purchaseX').classList.toggle('on', v===false);
+  document.getElementById('purchaseNoteField').style.display = (v===true)?'block':'none';
 }
 function setRespi(who){ const r=DATA[curId].report; r.respiTarget = (r.respiTarget===who)?null:who; updateRespiUI(r.respiTarget); render(); }
 function updateRespiUI(who){
@@ -1085,6 +1117,18 @@ function reportText(){
     if(r.dayMemo && r.dayMemo.trim()) t+=`\n\n${r.dayMemo.trim()}`;
     return t.replace(/\s+$/,'');
   }
+  if(curMode==='event'){
+    const roundLabel = v.round ? `${v.round}일차 ` : '';
+    const purchaseVal = r.purchase===true?'O':(r.purchase===false?'X':'');
+    const lines=[];
+    lines.push(`📌 ${dateLabelKR(v.dateKey)} ${roundLabel}행사당일 보고`);
+    lines.push(`점포명 : ${v.brand} ${v.store}`);
+    lines.push(`구매 : ${purchaseVal}`);
+    if(r.purchase===true && r.purchaseNote && r.purchaseNote.trim())
+      lines.push(`_ 구매 내용 : ${r.purchaseNote.trim()}`);
+    lines.push(`특이사항 : ${(r.eventMemo&&r.eventMemo.trim())?r.eventMemo.trim():''}`);
+    return lines.join('\n').replace(/\s+$/,'');
+  }
   // 사전방문 — 체크리스트 양식
   const stockLine = buildStockLine(r.stock) || '없음';
   const respiVal = (r.respiTarget==='점주'||r.respiTarget==='직원') ? r.respiTarget : '';
@@ -1107,13 +1151,15 @@ function render(){
   const r=DATA[curId].report;
   r.env=document.getElementById('envText').value;
   r.dayMemo=document.getElementById('dayMemo').value;
+  r.purchaseNote=document.getElementById('purchaseNote').value;
+  r.eventMemo=document.getElementById('eventMemo').value;
   const t=reportText();
   document.getElementById('preview').textContent= t || '—';
 }
 
 /* ── 완료 처리 (상태 + 기록 저장) ── */
 function finalizeReport(){
-  DATA[curId].report.status = curMode==='day'?'당일완료':'사전완료';
+  DATA[curId].report.status = curMode==='day'?'당일완료': curMode==='event'?'행사완료':'사전완료';
   const v=DATA[curId], r=v.report;
   const st=normStock(r.stock); const hasStock=Object.keys(st).length>0;
   if(hasStock || r.env || r.refill!==null || r.stand!==null){
