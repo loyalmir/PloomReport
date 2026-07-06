@@ -220,7 +220,13 @@
   .hint{font-size:11.5px; color:var(--txt-faint); margin-top:7px; line-height:1.5;}
   .ok{color:var(--green);} .warn{color:var(--amber);}
 
-  .toast{
+  .inv-row{display:flex; gap:7px; align-items:center; margin-bottom:9px;}
+  .inv-row input{background:var(--surface); border:1px solid var(--line); border-radius:var(--r-sm); color:var(--txt); font-family:inherit; font-size:15px; padding:10px 11px;}
+  .inv-row .i-name{flex:2;}
+  .inv-row .i-qty{flex:1; min-width:0;}
+  .inv-row .i-note{flex:2;}
+  .inv-row input:focus{outline:none; border-color:var(--blue);}
+  .inv-del{flex-shrink:0; width:32px; height:32px; border-radius:50%; background:var(--surface-2); border:1px solid var(--line); color:var(--txt-faint); font-size:16px; cursor:pointer; line-height:1;}
     position:fixed; bottom:96px; left:50%; transform:translateX(-50%) translateY(20px);
     background:var(--txt); color:var(--ink); padding:11px 20px; border-radius:24px; font-weight:800; font-size:14px;
     opacity:0; pointer-events:none; transition:.25s; z-index:99; box-shadow:0 8px 30px rgba(0,0,0,.4);
@@ -252,6 +258,38 @@
     <div class="filter-row" id="teamChips"><span class="lbl">팀</span></div>
   </div>
   <main id="storeList"></main>
+</section>
+
+<!-- ════════ 마감재고 ════════ -->
+<section class="view" id="view-inventory">
+  <main>
+    <div class="panel">
+      <h3>마감재고 보고</h3>
+      <div style="display:flex; gap:9px; margin-bottom:12px;">
+        <div style="flex:1;">
+          <label style="font-size:12px; font-weight:700; color:var(--txt-dim); display:block; margin-bottom:6px;">팀명</label>
+          <input type="text" id="invTeam" placeholder="예) 3팀" oninput="renderInv()">
+        </div>
+        <div style="flex:1;">
+          <label style="font-size:12px; font-weight:700; color:var(--txt-dim); display:block; margin-bottom:6px;">이름</label>
+          <input type="text" id="invName" placeholder="예) 김건하" oninput="renderInv()">
+        </div>
+      </div>
+    </div>
+    <div class="panel">
+      <h3>재고 항목</h3>
+      <div id="invItems"></div>
+      <button class="btn btn-ghost btn-block" onclick="addInvItem()" style="margin-top:10px;">+ 항목 추가</button>
+    </div>
+    <div class="panel">
+      <div class="preview-label"><span class="live"></span>카톡에 붙일 내용</div>
+      <div class="kakao-stage"><div class="bubble" id="invPreview">—</div></div>
+    </div>
+    <div style="display:flex; gap:9px; padding:0 0 8px;">
+      <button class="btn btn-ghost" style="flex:1;" onclick="copyInv()">복사</button>
+      <button class="btn btn-kakao" style="flex:2;" onclick="shareInv()">공유</button>
+    </div>
+  </main>
 </section>
 
 <!-- ════════ 일정 ════════ -->
@@ -345,7 +383,7 @@
       <p>입력한 일정·보고 내용을 모두 지웁니다. (API 키는 유지)</p>
       <button class="btn btn-ghost btn-block" onclick="wipeData()">전체 일정 삭제</button>
     </div>
-    <div style="text-align:center; color:var(--txt-faint); font-size:11px; padding:6px 0 10px;" class="mono">ploom-report · build 0620b</div>
+    <div style="text-align:center; color:var(--txt-faint); font-size:11px; padding:6px 0 10px;" class="mono">ploom-report · build 0621</div>
   </main>
 </section>
 
@@ -466,6 +504,10 @@
   <button data-view="schedule" onclick="switchView('schedule')">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
     일정
+  </button>
+  <button data-view="inventory" onclick="switchView('inventory')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="18" rx="2"/><path d="M8 3v18M2 9h20M2 15h20"/></svg>
+    마감재고
   </button>
   <button data-view="settings" onclick="switchView('settings')">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1.3l2-1.6-2-3.4-2.4 1a7 7 0 0 0-2.2-1.3L13.8 2h-3.6L9.7 4.4a7 7 0 0 0-2.2 1.3l-2.4-1-2 3.4 2 1.6A7 7 0 0 0 5 12a7 7 0 0 0 .1 1.3l-2 1.6 2 3.4 2.4-1a7 7 0 0 0 2.2 1.3l.5 2.4h3.6l.5-2.4a7 7 0 0 0 2.2-1.3l2.4 1 2-3.4-2-1.6A7 7 0 0 0 19 12z"/></svg>
@@ -1349,6 +1391,67 @@ function saveApiKey(){
 function wipeData(){ if(confirm('일정과 보고 내용을 모두 지울까요?')){ DATA={}; Store.save(); toast('비웠습니다'); } }
 function forceRefresh(){ window.location.href = window.location.pathname + '?v=' + Date.now(); }
 
+/* ═══════════ 마감재고 ═══════════ */
+let INV = loadInv();
+function loadInv(){
+  try{ return JSON.parse(localStorage.getItem('ploomInv')||'null') || {items:[
+    {id:1,name:'블랙',qty:'',note:''},{id:2,name:'실버',qty:'',note:''},
+    {id:3,name:'로즈골드',qty:'',note:''},{id:4,name:'네이비',qty:'',note:''},
+    {id:5,name:'스타벅스',qty:'',note:''}
+  ]}; }catch(e){ return {items:[]}; }
+}
+function saveInv(){ localStorage.setItem('ploomInv', JSON.stringify(INV)); }
+let invNextId = Date.now();
+function addInvItem(){ INV.items.push({id:++invNextId,name:'',qty:'',note:''}); saveInv(); renderInvItems(); renderInv(); }
+function delInvItem(id){ INV.items=INV.items.filter(x=>x.id!==id); saveInv(); renderInvItems(); renderInv(); }
+function updateInvItem(id, field, val){ const it=INV.items.find(x=>x.id===id); if(it) it[field]=val; saveInv(); renderInv(); }
+
+function renderInvItems(){
+  const el=document.getElementById('invItems');
+  el.innerHTML=INV.items.map(it=>`
+    <div class="inv-row">
+      <input class="i-name" type="text" placeholder="항목명" value="${esc(it.name)}" oninput="updateInvItem(${it.id},'name',this.value)">
+      <input class="i-qty"  type="text" placeholder="수량" value="${esc(it.qty)}" oninput="updateInvItem(${it.id},'qty',this.value)">
+      <input class="i-note" type="text" placeholder="비고(선택)" value="${esc(it.note)}" oninput="updateInvItem(${it.id},'note',this.value)">
+      <button class="inv-del" onclick="delInvItem(${it.id})">×</button>
+    </div>`).join('');
+}
+function invText(){
+  const team=(document.getElementById('invTeam')||{}).value||'';
+  const name=(document.getElementById('invName')||{}).value||'';
+  const d=new Date(); const date=`${d.getMonth()+1}/${d.getDate()}`;
+  const lines=[];
+  if(team) lines.push(`${team} 세일즈 종료했습니다`);
+  lines.push('');
+  if(name) lines.push(name);
+  lines.push(`${date}마감재고`);
+  lines.push('');
+  INV.items.forEach(it=>{
+    if(!it.name && !it.qty) return;
+    let line=`${it.name} ${it.qty}`.trim();
+    if(it.note && it.note.trim()) line+=`(${it.note.trim()})`;
+    lines.push(line);
+  });
+  return lines.join('\n').replace(/\n{3,}/g,'\n\n').replace(/\s+$/,'');
+}
+function renderInv(){
+  const el=document.getElementById('invPreview');
+  if(el) el.textContent=invText()||'—';
+}
+async function copyInv(){
+  const t=invText();
+  try{ await navigator.clipboard.writeText(t); }
+  catch(e){ const ta=document.createElement('textarea'); ta.value=t; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); }
+  toast('복사됨 · 카톡에 붙여넣기');
+}
+async function shareInv(){
+  const t=invText();
+  try{
+    if(navigator.share) await navigator.share({text:t});
+    else{ await navigator.clipboard.writeText(t); toast('공유 미지원 · 복사됨'); return; }
+  }catch(e){ if(e&&e.name==='AbortError') return; }
+}
+
 /* ═══════════ 탭 + 토스트 ═══════════ */
 function switchView(v){
   document.querySelectorAll('.view').forEach(s=>s.classList.remove('on'));
@@ -1368,6 +1471,13 @@ window.addEventListener('DOMContentLoaded',()=>{
   const m=localStorage.getItem('ploomModel'); if(m) document.getElementById('modelSel').value=m;
   const lc=localStorage.getItem('ploomLinkCode'); if(lc) document.getElementById('linkCodeInput').value=lc;
   document.getElementById('visitorInput').value=getVisitorName();
+  // 마감재고 팀·이름 초기값
+  const it=document.getElementById('invTeam'); if(it) it.value=localStorage.getItem('ploomTeamName')||'';
+  const in2=document.getElementById('invName'); if(in2) in2.value=getVisitorName();
+  // 이름 입력 시 방문자 이름도 함께 업데이트
+  if(in2) in2.addEventListener('change',()=>{ localStorage.setItem('ploomVisitor',in2.value||'SV 김건하'); });
+  if(it) it.addEventListener('change',()=>{ localStorage.setItem('ploomTeamName',it.value); });
+  renderInvItems(); renderInv();
   document.getElementById('dayRepOff').classList.toggle('on', !dayReportOn);
   document.getElementById('dayRepOn').classList.toggle('on', dayReportOn);
   document.getElementById('modeSeg').style.display = dayReportOn?'flex':'none';
