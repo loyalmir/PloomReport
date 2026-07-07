@@ -409,7 +409,7 @@
       <p>입력한 일정·보고 내용을 모두 지웁니다. (API 키는 유지)</p>
       <button class="btn btn-ghost btn-block" onclick="wipeData()">전체 일정 삭제</button>
     </div>
-    <div style="text-align:center; color:var(--txt-faint); font-size:11px; padding:6px 0 10px;" class="mono">ploom-report · build 0625e</div>
+    <div style="text-align:center; color:var(--txt-faint); font-size:11px; padding:6px 0 10px;" class="mono">ploom-report · build 0625f</div>
   </main>
 </section>
 
@@ -1536,8 +1536,7 @@ function renderInvItems(){
     const noteBtn=document.createElement('button'); noteBtn.className='inv-note-btn';
     if(it.note) noteBtn.classList.add('has-note');
     noteBtn.textContent='✎'; noteBtn.title='비고';
-    const isExpanded=expandedNotes.has(it.id)||(!!it.note);
-    if(it.note) expandedNotes.add(it.id);
+    const isExpanded=expandedNotes.has(it.id);
     noteBtn.onclick=()=>{
       if(expandedNotes.has(it.id)){ expandedNotes.delete(it.id); noteRow.style.display='none'; }
       else{ expandedNotes.add(it.id); noteRow.style.display='flex'; noteInp.focus(); }
