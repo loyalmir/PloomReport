@@ -276,9 +276,13 @@
     </div>
     <div class="panel">
       <h3>재고 항목</h3>
-      <div id="invItems"></div>
-      <div style="display:flex; gap:9px; margin-top:10px;">
-        <button class="btn btn-ghost" style="flex:1;" onclick="addInvItem()">+ 항목 추가</button>
+      <div style="font-size:12px; font-weight:800; color:var(--txt-dim); margin-bottom:8px; letter-spacing:.4px;">창고</div>
+      <div id="invItemsWarehouse"></div>
+      <button class="btn btn-ghost btn-block" onclick="addInvItem('warehouse')" style="margin-bottom:18px;">+ 창고 항목 추가</button>
+      <div style="font-size:12px; font-weight:800; color:var(--txt-dim); margin-bottom:8px; letter-spacing:.4px;">운영</div>
+      <div id="invItemsOperation"></div>
+      <div style="display:flex; gap:9px; margin-top:4px;">
+        <button class="btn btn-ghost" style="flex:1;" onclick="addInvItem('operation')">+ 운영 항목 추가</button>
         <button class="btn btn-primary" onclick="saveInvConfirm()">저장</button>
       </div>
     </div>
@@ -391,7 +395,7 @@
       <p>입력한 일정·보고 내용을 모두 지웁니다. (API 키는 유지)</p>
       <button class="btn btn-ghost btn-block" onclick="wipeData()">전체 일정 삭제</button>
     </div>
-    <div style="text-align:center; color:var(--txt-faint); font-size:11px; padding:6px 0 10px;" class="mono">ploom-report · build 0623</div>
+    <div style="text-align:center; color:var(--txt-faint); font-size:11px; padding:6px 0 10px;" class="mono">ploom-report · build 0624</div>
   </main>
 </section>
 
@@ -1442,18 +1446,27 @@ function forceRefresh(){ window.location.href = window.location.pathname + '?v='
 
 /* ═══════════ 마감재고 ═══════════ */
 let INV = loadInv();
+function defaultItems(){ return [
+  {id:Date.now()+Math.random(),name:'블랙',qty:'',note:''},
+  {id:Date.now()+Math.random(),name:'실버',qty:'',note:''},
+  {id:Date.now()+Math.random(),name:'로즈골드',qty:'',note:''},
+  {id:Date.now()+Math.random(),name:'네이비',qty:'',note:''},
+  {id:Date.now()+Math.random(),name:'스타벅스',qty:'',note:''}
+]; }
 function loadInv(){
-  try{ return JSON.parse(localStorage.getItem('ploomInv')||'null') || {items:[
-    {id:1,name:'블랙',qty:'',note:''},{id:2,name:'실버',qty:'',note:''},
-    {id:3,name:'로즈골드',qty:'',note:''},{id:4,name:'네이비',qty:'',note:''},
-    {id:5,name:'스타벅스',qty:'',note:''}
-  ]}; }catch(e){ return {items:[]}; }
+  try{
+    const d=JSON.parse(localStorage.getItem('ploomInv')||'null');
+    if(!d) return {warehouse:defaultItems(), operation:defaultItems()};
+    // 이전 단일 items 구조 마이그레이션
+    if(d.items && !d.warehouse) return {warehouse:d.items, operation:defaultItems()};
+    return {warehouse:d.warehouse||defaultItems(), operation:d.operation||defaultItems()};
+  }catch(e){ return {warehouse:defaultItems(), operation:defaultItems()}; }
 }
 function saveInv(){ localStorage.setItem('ploomInv', JSON.stringify(INV)); }
 let invNextId = Date.now();
-function addInvItem(){ INV.items.push({id:++invNextId,name:'',qty:'',note:''}); saveInv(); renderInvItems(); renderInv(); }
-function delInvItem(id){ INV.items=INV.items.filter(x=>x.id!==id); saveInv(); renderInvItems(); renderInv(); }
-function updateInvItem(id, field, val){ const it=INV.items.find(x=>x.id===id); if(it) it[field]=val; saveInv(); renderInv(); }
+function addInvItem(sec){ INV[sec].push({id:++invNextId,name:'',qty:'',note:''}); saveInv(); renderInvItems(); renderInv(); }
+function delInvItem(sec, id){ INV[sec]=INV[sec].filter(x=>x.id!==id); saveInv(); renderInvItems(); renderInv(); }
+function updateInvItem(sec, id, field, val){ const it=INV[sec].find(x=>x.id===id); if(it){ it[field]=val; saveInv(); renderInv(); } }
 
 // 수식 자동 계산: "35+3" → 38, "33-2" → 31
 function evalQty(str){
@@ -1468,31 +1481,30 @@ function evalQty(str){
   return result;
 }
 function renderInvItems(){
-  const el=document.getElementById('invItems'); el.innerHTML='';
-  INV.items.forEach(it=>{
-    const row=document.createElement('div'); row.className='inv-row';
-    // 항목명
-    const nm=document.createElement('input'); nm.className='i-name'; nm.type='text';
-    nm.placeholder='항목명'; nm.value=it.name;
-    nm.addEventListener('input',()=>updateInvItem(it.id,'name',nm.value));
-    // 수량 (수식 계산 지원)
-    const qy=document.createElement('input'); qy.className='i-qty'; qy.type='text';
-    qy.inputMode='decimal'; qy.placeholder='수량';
-    qy.value=it.qty||'';
-    qy.addEventListener('input',()=>updateInvItem(it.id,'qty',qy.value));
-    qy.addEventListener('blur',()=>{
-      const r=evalQty(qy.value);
-      if(r!==null && String(r)!==qy.value){ qy.value=String(r); updateInvItem(it.id,'qty',qy.value); }
+  ['warehouse','operation'].forEach(sec=>{
+    const el=document.getElementById(sec==='warehouse'?'invItemsWarehouse':'invItemsOperation');
+    if(!el) return;
+    el.innerHTML='';
+    (INV[sec]||[]).forEach(it=>{
+      const row=document.createElement('div'); row.className='inv-row';
+      const nm=document.createElement('input'); nm.className='i-name'; nm.type='text';
+      nm.placeholder='항목명'; nm.value=it.name;
+      nm.addEventListener('input',()=>updateInvItem(sec,it.id,'name',nm.value));
+      const qy=document.createElement('input'); qy.className='i-qty'; qy.type='text';
+      qy.inputMode='decimal'; qy.placeholder='수량'; qy.value=it.qty||'';
+      qy.addEventListener('input',()=>updateInvItem(sec,it.id,'qty',qy.value));
+      qy.addEventListener('blur',()=>{
+        const r=evalQty(qy.value);
+        if(r!==null && String(r)!==qy.value){ qy.value=String(r); updateInvItem(sec,it.id,'qty',qy.value); }
+      });
+      const nt=document.createElement('input'); nt.className='i-note'; nt.type='text';
+      nt.placeholder='비고(선택)'; nt.value=it.note||'';
+      nt.addEventListener('input',()=>updateInvItem(sec,it.id,'note',nt.value));
+      const del=document.createElement('button'); del.className='inv-del';
+      del.textContent='×'; del.onclick=()=>delInvItem(sec,it.id);
+      row.append(nm, qy, nt, del);
+      el.appendChild(row);
     });
-    // 비고
-    const nt=document.createElement('input'); nt.className='i-note'; nt.type='text';
-    nt.placeholder='비고(선택)'; nt.value=it.note||'';
-    nt.addEventListener('input',()=>updateInvItem(it.id,'note',nt.value));
-    // 삭제
-    const del=document.createElement('button'); del.className='inv-del';
-    del.textContent='×'; del.onclick=()=>delInvItem(it.id);
-    row.append(nm, qy, nt, del);
-    el.appendChild(row);
   });
 }
 function saveInvConfirm(){ saveInv(); toast('저장됨 ✓'); }
@@ -1507,30 +1519,33 @@ function invText(){
   const team=(document.getElementById('invTeam')||{}).value||'';
   const name=(document.getElementById('invName')||{}).value||'';
   const d=new Date(); const date=`${d.getMonth()+1}/${d.getDate()}`;
-  const itemLines=[];
-  INV.items.forEach(it=>{
-    if(!it.name && !it.qty) return;
-    let line=`${it.name} ${it.qty}`.trim();
-    if(it.note && it.note.trim()) line+=`(${it.note.trim()})`;
-    itemLines.push(line);
-  });
+  function secLines(sec){
+    const lines=[];
+    (INV[sec]||[]).forEach(it=>{
+      if(!it.name && !it.qty) return;
+      let line=`${it.name} ${it.qty}`.trim();
+      if(it.note && it.note.trim()) line+=`(${it.note.trim()})`;
+      lines.push(line);
+    });
+    return lines;
+  }
+  const wLines=secLines('warehouse'), oLines=secLines('operation');
   if(invMode==='start'){
-    // 시작보고: 팀 날짜 세일즈 시작했습니다.\n\n이름\n항목들
     const lines=[];
     if(team) lines.push(`${team} ${date} 세일즈 시작했습니다.`);
     lines.push('');
     if(name) lines.push(name);
-    itemLines.forEach(l=>lines.push(l));
+    if(wLines.length){ lines.push(''); lines.push('창고'); wLines.forEach(l=>lines.push(l)); }
+    if(oLines.length){ lines.push(''); lines.push('운영'); oLines.forEach(l=>lines.push(l)); }
     return lines.join('\n').replace(/\n{3,}/g,'\n\n').replace(/\s+$/,'');
   } else {
-    // 마감보고: 팀 세일즈 종료했습니다\n\n이름\n날짜마감재고\n\n항목들
     const lines=[];
     if(team) lines.push(`${team} 세일즈 종료했습니다`);
     lines.push('');
     if(name) lines.push(name);
     lines.push(`${date}마감재고`);
-    lines.push('');
-    itemLines.forEach(l=>lines.push(l));
+    if(wLines.length){ lines.push(''); lines.push('창고'); wLines.forEach(l=>lines.push(l)); }
+    if(oLines.length){ lines.push(''); lines.push('운영'); oLines.forEach(l=>lines.push(l)); }
     return lines.join('\n').replace(/\n{3,}/g,'\n\n').replace(/\s+$/,'');
   }
 }
