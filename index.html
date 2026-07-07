@@ -222,6 +222,11 @@
   .inv-row .i-total{width:42px; flex-shrink:0; font-size:14px; font-weight:800; color:var(--blue); text-align:center; background:rgba(74,140,255,.1); border-radius:8px; padding:9px 4px; border:1px solid rgba(74,140,255,.2);}
   .inv-row input:focus{outline:none; border-color:var(--blue);}
   .inv-del{flex-shrink:0; width:30px; height:30px; border-radius:50%; background:var(--surface-2); border:1px solid var(--line); color:var(--txt-faint); font-size:15px; cursor:pointer; line-height:1;}
+  .inv-note-btn{flex-shrink:0; width:26px; height:26px; border-radius:7px; background:none; border:1px solid var(--line); color:var(--txt-faint); font-size:13px; cursor:pointer; line-height:1; transition:.1s;}
+  .inv-note-btn.has-note{background:rgba(74,140,255,.16); border-color:var(--blue); color:var(--blue);}
+  .inv-note-row{padding:0 0 8px 2px; display:none;}
+  .inv-note-row input{width:100%; background:var(--surface); border:1px solid var(--line); border-radius:var(--r-sm); color:var(--txt); font-family:inherit; font-size:14px; padding:8px 11px;}
+  .inv-note-row input:focus{outline:none; border-color:var(--blue);}
     position:fixed; bottom:96px; left:50%; transform:translateX(-50%) translateY(20px);
     background:var(--txt); color:var(--ink); padding:11px 20px; border-radius:24px; font-weight:800; font-size:14px;
     opacity:0; pointer-events:none; transition:.25s; z-index:99; box-shadow:0 8px 30px rgba(0,0,0,.4);
@@ -404,7 +409,7 @@
       <p>입력한 일정·보고 내용을 모두 지웁니다. (API 키는 유지)</p>
       <button class="btn btn-ghost btn-block" onclick="wipeData()">전체 일정 삭제</button>
     </div>
-    <div style="text-align:center; color:var(--txt-faint); font-size:11px; padding:6px 0 10px;" class="mono">ploom-report · build 0625c</div>
+    <div style="text-align:center; color:var(--txt-faint); font-size:11px; padding:6px 0 10px;" class="mono">ploom-report · build 0625d</div>
   </main>
 </section>
 
@@ -1502,9 +1507,12 @@ function evalQty(str){
   return result;
 }
 function calcTotal(it){ const w=parseInt(it.warehouse)||0, o=parseInt(it.operation)||0; return (w||o)?(w+o):null; }
+const expandedNotes=new Set();
 function renderInvItems(){
   const el=document.getElementById('invItems'); if(!el) return; el.innerHTML='';
   INV.items.forEach(it=>{
+    const wrap=document.createElement('div');
+    // 메인 행
     const row=document.createElement('div'); row.className='inv-row';
     const nm=document.createElement('input'); nm.className='i-name'; nm.type='text';
     nm.placeholder='항목명'; nm.value=it.name;
@@ -1524,10 +1532,32 @@ function renderInvItems(){
     const tot=document.createElement('div'); tot.className='i-total';
     const t=calcTotal(it); tot.textContent=t!==null?String(t):'';
     function updateTotal(){ const t2=calcTotal(it); tot.textContent=t2!==null?String(t2):''; renderInv(); }
+    // 비고 토글 버튼
+    const noteBtn=document.createElement('button'); noteBtn.className='inv-note-btn';
+    if(it.note) noteBtn.classList.add('has-note');
+    noteBtn.textContent='✎'; noteBtn.title='비고';
+    const isExpanded=expandedNotes.has(it.id)||(!!it.note);
+    if(it.note) expandedNotes.add(it.id);
+    noteBtn.onclick=()=>{
+      if(expandedNotes.has(it.id)){ expandedNotes.delete(it.id); noteRow.style.display='none'; }
+      else{ expandedNotes.add(it.id); noteRow.style.display='flex'; noteInp.focus(); }
+    };
     const del=document.createElement('button'); del.className='inv-del';
-    del.textContent='×'; del.onclick=()=>delInvItem(it.id);
-    row.append(nm, wInp, plus, oInp, tot, del);
-    el.appendChild(row);
+    del.textContent='×'; del.onclick=()=>{ expandedNotes.delete(it.id); delInvItem(it.id); };
+    row.append(nm, wInp, plus, oInp, tot, noteBtn, del);
+    // 비고 행 (접힘/펼침)
+    const noteRow=document.createElement('div'); noteRow.className='inv-note-row';
+    noteRow.style.display=isExpanded?'flex':'none';
+    const noteInp=document.createElement('input'); noteInp.type='text';
+    noteInp.placeholder='비고 입력… (예: 개봉후 환불제품 1개 포함)';
+    noteInp.value=it.note||'';
+    noteInp.addEventListener('input',()=>{
+      updateInvItem(it.id,'note',noteInp.value);
+      noteBtn.classList.toggle('has-note',!!noteInp.value);
+    });
+    noteRow.appendChild(noteInp);
+    wrap.appendChild(row); wrap.appendChild(noteRow);
+    el.appendChild(wrap);
   });
 }
 function saveInvConfirm(){ saveInv(); toast('저장됨 ✓'); }
