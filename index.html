@@ -298,8 +298,8 @@
     </div>
     <div class="panel">
       <div class="seg" style="margin-bottom:12px;">
-        <button id="invDetailBtn" class="on" onclick="setInvReport('detail')">상세 (38+4=42)</button>
-        <button id="invTotalBtn" onclick="setInvReport('total')">총량 (42)</button>
+        <button id="invDetailBtn" onclick="setInvReport('detail')">상세 (38+4=42)</button>
+        <button id="invTotalBtn" class="on" onclick="setInvReport('total')">총량 (42)</button>
       </div>
       <div class="preview-label"><span class="live"></span>카톡에 붙일 내용</div>
       <div class="kakao-stage"><div class="bubble" id="invPreview">—</div></div>
@@ -409,7 +409,7 @@
       <p>입력한 일정·보고 내용을 모두 지웁니다. (API 키는 유지)</p>
       <button class="btn btn-ghost btn-block" onclick="wipeData()">전체 일정 삭제</button>
     </div>
-    <div style="text-align:center; color:var(--txt-faint); font-size:11px; padding:6px 0 10px;" class="mono">ploom-report · build 0625d</div>
+    <div style="text-align:center; color:var(--txt-faint); font-size:11px; padding:6px 0 10px;" class="mono">ploom-report · build 0625e</div>
   </main>
 </section>
 
@@ -528,13 +528,13 @@
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M12 3v18" opacity="0"/><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/></svg>
     오늘
   </button>
-  <button data-view="schedule" onclick="switchView('schedule')">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
-    일정
-  </button>
   <button data-view="inventory" onclick="switchView('inventory')">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="18" rx="2"/><path d="M8 3v18M2 9h20M2 15h20"/></svg>
     마감재고
+  </button>
+  <button data-view="schedule" onclick="switchView('schedule')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
+    일정
   </button>
   <button data-view="settings" onclick="switchView('settings')">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1.3l2-1.6-2-3.4-2.4 1a7 7 0 0 0-2.2-1.3L13.8 2h-3.6L9.7 4.4a7 7 0 0 0-2.2 1.3l-2.4-1-2 3.4 2 1.6A7 7 0 0 0 5 12a7 7 0 0 0 .1 1.3l-2 1.6 2 3.4 2.4-1a7 7 0 0 0 2.2 1.3l.5 2.4h3.6l.5-2.4a7 7 0 0 0 2.2-1.3l2.4 1 2-3.4-2-1.6A7 7 0 0 0 19 12z"/></svg>
@@ -1488,7 +1488,7 @@ function loadInv(){
   }catch(e){ return {items:defaultItems()}; }
 }
 function saveInv(){ localStorage.setItem('ploomInv', JSON.stringify(INV)); }
-let invNextId=Date.now(), invReportMode='detail';
+let invNextId=Date.now(), invReportMode='total';
 function addInvItem(){ INV.items.push({id:++invNextId,name:'',warehouse:'',operation:'',note:''}); saveInv(); renderInvItems(); renderInv(); }
 function delInvItem(id){ INV.items=INV.items.filter(x=>x.id!==id); saveInv(); renderInvItems(); renderInv(); }
 function updateInvItem(id,field,val){ const it=INV.items.find(x=>x.id===id); if(it){ it[field]=val; saveInv(); renderInv(); } }
