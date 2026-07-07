@@ -404,7 +404,7 @@
       <p>입력한 일정·보고 내용을 모두 지웁니다. (API 키는 유지)</p>
       <button class="btn btn-ghost btn-block" onclick="wipeData()">전체 일정 삭제</button>
     </div>
-    <div style="text-align:center; color:var(--txt-faint); font-size:11px; padding:6px 0 10px;" class="mono">ploom-report · build 0625b</div>
+    <div style="text-align:center; color:var(--txt-faint); font-size:11px; padding:6px 0 10px;" class="mono">ploom-report · build 0625c</div>
   </main>
 </section>
 
@@ -1542,24 +1542,27 @@ function invText(){
   const team=(document.getElementById('invTeam')||{}).value||'';
   const name=(document.getElementById('invName')||{}).value||'';
   const d=new Date(); const date=`${d.getMonth()+1}/${d.getDate()}`;
-  function secLines(sec){
-    const lines=[];
-    (INV[sec]||[]).forEach(it=>{
-      if(!it.name && !it.qty) return;
-      let line=`${it.name} ${it.qty}`.trim();
-      if(it.note && it.note.trim()) line+=`(${it.note.trim()})`;
-      lines.push(line);
-    });
-    return lines;
-  }
-  const wLines=secLines('warehouse'), oLines=secLines('operation');
+  const itemLines=[];
+  INV.items.forEach(it=>{
+    if(!it.name) return;
+    const w=parseInt(it.warehouse)||0, o=parseInt(it.operation)||0;
+    if(!w && !o) return;
+    let line;
+    if(invReportMode==='detail'){
+      if(w && o) line=`${it.name} ${w} + ${o} = ${w+o}`;
+      else line=`${it.name} ${w||o}`;
+    } else {
+      line=`${it.name} ${w+o}`;
+    }
+    if(it.note && it.note.trim()) line+=`(${it.note.trim()})`;
+    itemLines.push(line);
+  });
   if(invMode==='start'){
     const lines=[];
     if(team) lines.push(`${team} ${date} 세일즈 시작했습니다.`);
     lines.push('');
     if(name) lines.push(name);
-    if(wLines.length){ lines.push(''); lines.push('창고'); wLines.forEach(l=>lines.push(l)); }
-    if(oLines.length){ lines.push(''); lines.push('운영'); oLines.forEach(l=>lines.push(l)); }
+    itemLines.forEach(l=>lines.push(l));
     return lines.join('\n').replace(/\n{3,}/g,'\n\n').replace(/\s+$/,'');
   } else {
     const lines=[];
@@ -1567,8 +1570,8 @@ function invText(){
     lines.push('');
     if(name) lines.push(name);
     lines.push(`${date}마감재고`);
-    if(wLines.length){ lines.push(''); lines.push('창고'); wLines.forEach(l=>lines.push(l)); }
-    if(oLines.length){ lines.push(''); lines.push('운영'); oLines.forEach(l=>lines.push(l)); }
+    lines.push('');
+    itemLines.forEach(l=>lines.push(l));
     return lines.join('\n').replace(/\n{3,}/g,'\n\n').replace(/\s+$/,'');
   }
 }
