@@ -410,7 +410,7 @@
       <p>입력한 일정·보고 내용을 모두 지웁니다. (API 키는 유지)</p>
       <button class="btn btn-ghost btn-block" onclick="wipeData()">전체 일정 삭제</button>
     </div>
-    <div style="text-align:center; color:var(--txt-faint); font-size:11px; padding:6px 0 10px;" class="mono">ploom-report · build 0625h</div>
+    <div style="text-align:center; color:var(--txt-faint); font-size:11px; padding:6px 0 10px;" class="mono">ploom-report · build 0626</div>
   </main>
 </section>
 
@@ -919,13 +919,13 @@ function renderFilters(){
   const vs = (filterGroup!=='전체') ? vsAll.filter(v=>(v.group||'')===filterGroup) : vsAll;
   let dates=uniq(vs.map(v=>v.dateKey).filter(Boolean)).sort((a,b)=>dateVal(a)-dateVal(b));
   if(!showPast) dates=dates.filter(d=>!isPast(d));
-  if(filterDate!=='전체' && filterDate!=='오늘' && !dates.includes(filterDate)) filterDate='오늘';
+  if(filterDate==='전체') filterDate='오늘';   // '전체' 없앰 → 오늘+다음으로 되돌림
+  if(filterDate!=='오늘' && !dates.includes(filterDate)) filterDate='오늘';
   const teams=uniq(vs.map(v=>v.team).filter(Boolean)).sort(teamSort);
   const hasPast = uniq(vs.map(v=>v.dateKey)).some(isPast);
   const dc=document.getElementById('dateChips');
   dc.innerHTML='<span class="lbl">날짜</span>'+
     `<span class="chip date ${filterDate==='오늘'?'on':''}" onclick="setFilter('filterDate','오늘')">오늘+다음</span>`+
-    chip('전체',filterDate==='전체','date','filterDate')+
     dates.map(d=>chip(d, filterDate===d,'date','filterDate')).join('');
   const pb=document.getElementById('pastBtn');
   pb.classList.toggle('hidden', !hasPast);
