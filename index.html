@@ -410,7 +410,7 @@
       <p>입력한 일정·보고 내용을 모두 지웁니다. (API 키는 유지)</p>
       <button class="btn btn-ghost btn-block" onclick="wipeData()">전체 일정 삭제</button>
     </div>
-    <div style="text-align:center; color:var(--txt-faint); font-size:11px; padding:6px 0 10px;" class="mono">ploom-report · build 0626</div>
+    <div style="text-align:center; color:var(--txt-faint); font-size:11px; padding:6px 0 10px;" class="mono">ploom-report · build 0627</div>
   </main>
 </section>
 
@@ -591,12 +591,23 @@ function setImportMode(m){
 function todayKey(){ const d=new Date(); return (d.getMonth()+1)+'.'+d.getDate(); }
 function tomorrowKey(){ const d=new Date(); d.setDate(d.getDate()+1); return (d.getMonth()+1)+'.'+d.getDate(); }
 function dateVal(k){ const p=(k||'').split('.').map(Number); return (p[0]||0)*100+(p[1]||0); }
-function prevDateKey(k){  // 사전방문 = 행사일 직전 평일 (토·일은 금요일로 당김)
+function prevDateKey(k, teamName){  // 사전방문 = 엑셀 일정상 그 팀의 직전 일정일 (공휴일 자동 반영)
+  const tv=dateVal(k);
+  if(!tv) return k;
+  // 같은 팀의 일정 중 행사일보다 앞선 가장 가까운 날짜
+  const cands=visits()
+    .filter(v=> (!teamName || v.team===teamName) && dateVal(v.dateKey)<tv)
+    .map(v=>dateVal(v.dateKey));
+  if(cands.length){
+    const prevVal=Math.max(...cands);
+    const hit=visits().find(v=>dateVal(v.dateKey)===prevVal && (!teamName || v.team===teamName));
+    if(hit) return hit.dateKey;
+  }
+  // 일정에 직전 날짜가 없으면 (첫 회차 등) 하루 전으로 폴백
   const p=(k||'').split('.').map(Number);
   if(p.length<2 || !p[0]) return k;
   const d=new Date(Date.UTC(new Date().getFullYear(), p[0]-1, p[1]));
   d.setUTCDate(d.getUTCDate()-1);
-  while(d.getUTCDay()===0 || d.getUTCDay()===6) d.setUTCDate(d.getUTCDate()-1);  // 0=일,6=토 건너뜀
   return (d.getUTCMonth()+1)+'.'+d.getUTCDate();
 }
 function dateLabelKR(k){ const p=(k||'').split('.').map(Number); return p.length<2?k:`${p[0]}월 ${p[1]}일`; }
@@ -1224,7 +1235,7 @@ function reportText(){
   const refillVal = r.refill===true?'보유':(r.refill===false?'미보유':'');
   const standVal = r.stand===true?'설치':(r.stand===false?'미설치':'');
   const lines=[];
-  lines.push(`■ ${dateLabelKR(prevDateKey(v.dateKey))}`);
+  lines.push(`■ ${dateLabelKR(prevDateKey(v.dateKey, v.team))}${v.round?` / ${v.round}일차`:''}`);
   lines.push(`${v.team} 사전방문보고`);
   lines.push(`방문자 : ${getVisitorName()}`);
   lines.push(`점포명 : ${v.brand} ${v.store} (${v.type})`);
