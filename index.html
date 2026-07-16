@@ -181,6 +181,8 @@
     width:72px; height:72px; border-radius:9px; border:1.5px dashed var(--line); background:var(--surface);
     display:flex; align-items:center; justify-content:center; color:var(--txt-faint); font-size:24px; cursor:pointer;
   }
+  .photo-broken{width:72px; height:72px; border-radius:9px; border:1.5px dashed var(--coral); background:rgba(255,107,92,.08); color:var(--coral); font-size:11px; font-weight:800; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; cursor:pointer; line-height:1.3;}
+  .photo-broken span{font-size:9px; font-weight:600; opacity:.75; margin-top:2px;}
   .thumb-wrap{position:relative;}
   .thumb-x{position:absolute; top:-6px; right:-6px; width:22px; height:22px; border-radius:50%; background:var(--coral); color:#fff; border:none; font-size:14px; line-height:1; cursor:pointer; font-weight:800; z-index:2;}
 
@@ -410,7 +412,7 @@
       <p>입력한 일정·보고 내용을 모두 지웁니다. (API 키는 유지)</p>
       <button class="btn btn-ghost btn-block" onclick="wipeData()">전체 일정 삭제</button>
     </div>
-    <div style="text-align:center; color:var(--txt-faint); font-size:11px; padding:6px 0 10px;" class="mono">ploom-report · build 0627</div>
+    <div style="text-align:center; color:var(--txt-faint); font-size:11px; padding:6px 0 10px;" class="mono">ploom-report · build 0628</div>
   </main>
 </section>
 
@@ -644,7 +646,13 @@ const Store = {
           if(localHistory) await this.db.ref(this.path('history')).set(localHistory);
         }
         // 실시간 리스너 연결
-        this.db.ref(this.path('visits')).on('value',s=>{ DATA=s.val()||{}; renderAll(); });
+        this.db.ref(this.path('visits')).on('value',s=>{
+          const incoming=s.val()||{};
+          // 지금 편집 중인 매장은 화면에 입력한 내용을 지켜준다 (동기화가 덮어쓰지 않게)
+          if(curId && DATA[curId] && DATA[curId].report && incoming[curId])
+            incoming[curId].report = DATA[curId].report;
+          DATA=incoming; renderAll();
+        });
         this.db.ref(this.path('history')).on('value',s=>{ HISTORY=s.val()||{}; });
         document.getElementById('syncBadge').textContent='동기화 ON · '+code;
         document.getElementById('syncBadge').classList.add('cloud');
@@ -1246,16 +1254,25 @@ function reportText(){
   lines.push(`_ 진열장 설치여부 : ${standVal}`);
   return lines.join('\n').replace(/\s+$/,'');
 }
+let autoSaveT;
+function scheduleAutoSave(){   // 입력 중에도 잠깐 멈추면 자동 저장 (유실 방지)
+  clearTimeout(autoSaveT);
+  autoSaveT=setTimeout(()=>{ if(curId && DATA[curId]) Store.save(); }, 700);
+}
 function render(){
   if(!curId) return;
-  const r=DATA[curId].report;
-  r.env=document.getElementById('envText').value;
-  r.dayMemo=document.getElementById('dayMemo').value;
-  r.purchaseNote=document.getElementById('purchaseNote').value;
-  r.eventMemo=document.getElementById('eventMemo').value;
-  // consent는 버튼 클릭으로만 바뀌므로 render에서 읽지 않음
+  const v=DATA[curId]; if(!v) return;            // 매장이 사라졌으면 안전하게 중단
+  if(!v.report) v.report={stock:{}, respiTarget:'점주', env:'', refill:null, stand:null, purchase:null, purchaseNote:'', consent:false, eventMemo:'', dayMemo:'', status:''};
+  const r=v.report;
+  const val=id=>{ const el=document.getElementById(id); return el?el.value:''; };
+  r.env=val('envText');
+  r.dayMemo=val('dayMemo');
+  r.purchaseNote=val('purchaseNote');
+  r.eventMemo=val('eventMemo');
   const t=reportText();
-  document.getElementById('preview').textContent= t || '—';
+  const pv=document.getElementById('preview');
+  if(pv) pv.textContent= t || '—';
+  scheduleAutoSave();
 }
 
 /* ── 완료 처리 (상태 + 기록 저장) ── */
@@ -1305,16 +1322,22 @@ async function shareReport(){
 }
 
 /* ═══════════ 사진 ═══════════ */
-function addPhotos(ev){
+async function addPhotos(ev){
   const files=[...ev.target.files];
-  files.forEach(f=>{
-    const objectUrl=mkObjUrl(f);
-    photos.push({objectUrl, blob:f});
-    savePhotos(); renderPhotos();
-  });
   ev.target.value='';
+  if(!files.length) return;
+  for(const f of files){
+    try{
+      // iOS는 File이 원본 파일 '참조'라 나중에 만료될 수 있음 → 실제 데이터를 복사해 Blob으로 보관
+      const buf=await f.arrayBuffer();
+      const blob=new Blob([buf], {type:f.type||'image/jpeg'});
+      photos.push({objectUrl:mkObjUrl(blob), blob});
+    }catch(e){ console.warn('사진 읽기 실패',e); toast('사진 하나를 읽지 못했어요'); }
+  }
+  renderPhotos();
+  await savePhotos();
 }
-function savePhotos(){ if(curId) Photos.set(photoKey(curId,curMode), photos.map(p=>p.blob)); }
+function savePhotos(){ if(curId) return Photos.set(photoKey(curId,curMode), photos.map(p=>p.blob)); }
 function resizeImg(src, cb){
   const img=new Image();
   img.onload=()=>{
@@ -1333,7 +1356,14 @@ function renderPhotos(){
   row.querySelectorAll('.thumb-wrap').forEach(n=>n.remove());
   photos.forEach((p,i)=>{
     const w=document.createElement('div'); w.className='thumb-wrap';
-    w.innerHTML=`<img class="photo-thumb" src="${p.objectUrl}" onclick="viewPhoto(${i})"><button class="thumb-x" onclick="rmPhoto(${i})">×</button>`;
+    const img=document.createElement('img'); img.className='photo-thumb';
+    img.src=p.objectUrl; img.onclick=()=>viewPhoto(i);
+    img.onerror=()=>{   // 사진이 깨졌으면 조용히 넘어가지 않고 표시
+      w.innerHTML=`<div class="photo-broken" onclick="rmPhoto(${i})">사진<br>유실<br><span>탭해서 삭제</span></div>`;
+    };
+    const x=document.createElement('button'); x.className='thumb-x';
+    x.textContent='×'; x.onclick=()=>rmPhoto(i);
+    w.append(img,x);
     row.insertBefore(w, add);
   });
   document.getElementById('analyzeBtn').disabled = photos.length===0;
@@ -1648,6 +1678,13 @@ function toast(msg){
 }
 
 /* ═══════════ 시작 ═══════════ */
+// 앱을 백그라운드로 보내거나 닫을 때 즉시 저장 (유실 방지)
+function flushSave(){
+  if(curId && DATA[curId]){ try{ render(); }catch(e){} clearTimeout(autoSaveT); Store.save(); }
+}
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='hidden') flushSave(); });
+window.addEventListener('pagehide', flushSave);
+
 window.addEventListener('DOMContentLoaded',()=>{
   const k=localStorage.getItem('ploomApiKey'); if(k) document.getElementById('apiKey').value=k;
   const m=localStorage.getItem('ploomModel'); if(m) document.getElementById('modelSel').value=m;
