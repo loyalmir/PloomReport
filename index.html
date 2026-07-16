@@ -284,12 +284,12 @@
     </div>
     <div class="panel">
       <h3>재고 항목</h3>
-      <div style="display:flex; gap:5px; font-size:11px; font-weight:700; color:var(--txt-faint); margin-bottom:6px; padding:0 2px;">
+      <div id="invHeader" style="display:flex; gap:5px; font-size:11px; font-weight:700; color:var(--txt-faint); margin-bottom:6px; padding:0 2px;">
         <span style="flex:2; min-width:0;">항목명</span>
-        <span style="width:58px; flex-shrink:0; text-align:center;">창고</span>
+        <span style="width:58px; flex-shrink:0; text-align:center;" id="invColA">창고</span>
         <span style="font-size:11px; color:transparent; flex-shrink:0;">+</span>
-        <span style="width:58px; flex-shrink:0; text-align:center;">운영</span>
-        <span style="width:42px; flex-shrink:0; text-align:center;">합계</span>
+        <span style="width:58px; flex-shrink:0; text-align:center;" id="invColB">운영</span>
+        <span style="width:42px; flex-shrink:0; text-align:center;" id="invColC">합계</span>
         <span style="width:26px; flex-shrink:0;"></span>
         <span style="width:30px; flex-shrink:0;"></span>
       </div>
@@ -363,6 +363,15 @@
       <div class="hint" id="visitorMsg"></div>
     </div>
     <div class="panel">
+      <h3>재고 입력 방식</h3>
+      <p>본인 운영 방식에 맞게 골라두세요. 마감재고 화면의 입력칸이 바뀝니다.</p>
+      <div class="seg" style="margin-bottom:0;">
+        <button id="invModeAdd" onclick="setInvInputMode('add')">창고 + 운영</button>
+        <button id="invModeSub" onclick="setInvInputMode('sub')">총재고 − 판매</button>
+      </div>
+      <div class="hint">한 팀만 운영하면 <b>창고 + 운영</b>, 여러 팀을 관리하면 <b>총재고 − 판매</b>가 편해요.</div>
+    </div>
+    <div class="panel">
       <h3>당일보고</h3>
       <p>지금 당일보고를 안 쓰면 꺼두세요. 나중에 다시 필요해지면 켜면 편집창에 다시 나타납니다.</p>
       <div class="seg" style="margin-bottom:0;">
@@ -412,7 +421,7 @@
       <p>입력한 일정·보고 내용을 모두 지웁니다. (API 키는 유지)</p>
       <button class="btn btn-ghost btn-block" onclick="wipeData()">전체 일정 삭제</button>
     </div>
-    <div style="text-align:center; color:var(--txt-faint); font-size:11px; padding:6px 0 10px;" class="mono">ploom-report · build 0628</div>
+    <div style="text-align:center; color:var(--txt-faint); font-size:11px; padding:6px 0 10px;" class="mono">ploom-report · build 0629</div>
   </main>
 </section>
 
@@ -1531,10 +1540,40 @@ function loadInv(){
 }
 function saveInv(){ localStorage.setItem('ploomInv', JSON.stringify(INV)); }
 let invNextId=Date.now(), invReportMode='total';
+let invInputMode = localStorage.getItem('ploomInvInputMode')||'add';   // 'add' | 'sub'
+function setInvInputMode(m){
+  invInputMode=m; localStorage.setItem('ploomInvInputMode', m);
+  const a=document.getElementById('invModeAdd'), b=document.getElementById('invModeSub');
+  if(a) a.classList.toggle('on', m==='add');
+  if(b) b.classList.toggle('on', m==='sub');
+  applyInvHeader();
+  applyInvReportLabels();
+  renderInvItems(); renderInv();
+  toast(m==='add'?'창고 + 운영 방식':'총재고 − 판매 방식');
+}
+function applyInvHeader(){
+  const A=document.getElementById('invColA'), B=document.getElementById('invColB'), C=document.getElementById('invColC');
+  if(!A) return;
+  if(invInputMode==='sub'){ A.textContent='총재고'; B.textContent='판매'; C.textContent='남은'; }
+  else { A.textContent='창고'; B.textContent='운영'; C.textContent='합계'; }
+  // 연산 기호도 같이 바꿈
+  document.querySelectorAll('#invItems .i-plus').forEach(el=>{ el.textContent = invInputMode==='sub'?'−':'+'; });
+}
 function addInvItem(){ INV.items.push({id:++invNextId,name:'',warehouse:'',operation:'',note:''}); saveInv(); renderInvItems(); renderInv(); }
 function delInvItem(id){ INV.items=INV.items.filter(x=>x.id!==id); saveInv(); renderInvItems(); renderInv(); }
 function updateInvItem(id,field,val){ const it=INV.items.find(x=>x.id===id); if(it){ it[field]=val; saveInv(); renderInv(); } }
-function setInvReport(m){ invReportMode=m; document.getElementById('invDetailBtn').classList.toggle('on',m==='detail'); document.getElementById('invTotalBtn').classList.toggle('on',m==='total'); renderInv(); }
+function setInvReport(m){
+  invReportMode=m;
+  document.getElementById('invDetailBtn').classList.toggle('on',m==='detail');
+  document.getElementById('invTotalBtn').classList.toggle('on',m==='total');
+  renderInv();
+}
+function applyInvReportLabels(){
+  const d=document.getElementById('invDetailBtn'), t=document.getElementById('invTotalBtn');
+  if(!d) return;
+  d.textContent = invInputMode==='sub' ? '상세 (50-8=42)' : '상세 (38+4=42)';
+  t.textContent = '총량 (42)';
+}
 
 // 수식 자동 계산: "35+3" → 38, "33-2" → 31
 function evalQty(str){
@@ -1548,7 +1587,13 @@ function evalQty(str){
   }
   return result;
 }
-function calcTotal(it){ const w=parseInt(it.warehouse)||0, o=parseInt(it.operation)||0; return (w||o)?(w+o):null; }
+function invFields(){ return invInputMode==='sub' ? ['total','sold'] : ['warehouse','operation']; }
+function calcTotal(it){
+  const [fa,fb]=invFields();
+  const a=parseInt(it[fa])||0, b=parseInt(it[fb])||0;
+  if(!a && !b) return null;
+  return invInputMode==='sub' ? (a-b) : (a+b);
+}
 const expandedNotes=new Set();
 function renderInvItems(){
   const el=document.getElementById('invItems'); if(!el) return; el.innerHTML='';
@@ -1569,8 +1614,10 @@ function renderInvItems(){
       });
       return inp;
     };
-    const wInp=mk('warehouse',it.warehouse), oInp=mk('operation',it.operation);
-    const plus=document.createElement('span'); plus.className='i-plus'; plus.textContent='+';
+    const [fa,fb]=invFields();
+    const wInp=mk(fa,it[fa]), oInp=mk(fb,it[fb]);
+    const plus=document.createElement('span'); plus.className='i-plus';
+    plus.textContent = invInputMode==='sub' ? '−' : '+';
     const tot=document.createElement('div'); tot.className='i-total';
     const t=calcTotal(it); tot.textContent=t!==null?String(t):'';
     function updateTotal(){ const t2=calcTotal(it); tot.textContent=t2!==null?String(t2):''; renderInv(); }
@@ -1614,16 +1661,19 @@ function invText(){
   const name=(document.getElementById('invName')||{}).value||'';
   const d=new Date(); const date=`${d.getMonth()+1}/${d.getDate()}`;
   const itemLines=[];
+  const [fa,fb]=invFields();
+  const op = invInputMode==='sub' ? '-' : '+';
   INV.items.forEach(it=>{
     if(!it.name) return;
-    const w=parseInt(it.warehouse)||0, o=parseInt(it.operation)||0;
-    if(!w && !o) return;
+    const a=parseInt(it[fa])||0, b=parseInt(it[fb])||0;
+    if(!a && !b) return;
+    const result = invInputMode==='sub' ? (a-b) : (a+b);
     let line;
     if(invReportMode==='detail'){
-      if(w && o) line=`${it.name} ${w} + ${o} = ${w+o}`;
-      else line=`${it.name} ${w||o}`;
+      if(a && b) line=`${it.name} ${a} ${op} ${b} = ${result}`;
+      else line=`${it.name} ${result}`;
     } else {
-      line=`${it.name} ${w+o}`;
+      line=`${it.name} ${result}`;
     }
     if(it.note && it.note.trim()) line+=`(${it.note.trim()})`;
     itemLines.push(line);
@@ -1698,6 +1748,9 @@ window.addEventListener('DOMContentLoaded',()=>{
   // 이름 입력 시 방문자 이름도 함께 업데이트
   if(in2) in2.addEventListener('change',()=>{ localStorage.setItem('ploomVisitor',in2.value||'SV 김건하'); });
   if(it) it.addEventListener('change',()=>{ localStorage.setItem('ploomTeamName',it.value); });
+  document.getElementById('invModeAdd').classList.toggle('on', invInputMode==='add');
+  document.getElementById('invModeSub').classList.toggle('on', invInputMode==='sub');
+  applyInvHeader(); applyInvReportLabels();
   renderInvItems(); renderInv();
   document.getElementById('dayRepOff').classList.toggle('on', !dayReportOn);
   document.getElementById('dayRepOn').classList.toggle('on', dayReportOn);
