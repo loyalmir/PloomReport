@@ -440,7 +440,7 @@
       <p>입력한 일정·보고 내용을 모두 지웁니다. (API 키는 유지)</p>
       <button class="btn btn-ghost btn-block" onclick="wipeData()">전체 일정 삭제</button>
     </div>
-    <div style="text-align:center; color:var(--txt-faint); font-size:11px; padding:6px 0 10px;" class="mono">ploom-report · build 0633</div>
+    <div style="text-align:center; color:var(--txt-faint); font-size:11px; padding:6px 0 10px;" class="mono">ploom-report · build 0634</div>
   </main>
 </section>
 
@@ -1796,7 +1796,7 @@ function invText(){
   });
   if(invMode==='start'){
     const lines=[];
-    if(team) lines.push(`${team} ${date} 세일즈 시작했습니다.`);
+    if(team) lines.push(`${team} 세일즈 시작했습니다.`);
     lines.push('');
     if(name) lines.push(name);
     itemLines.forEach(l=>lines.push(l));
