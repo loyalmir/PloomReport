@@ -221,6 +221,8 @@
   .inv-row .i-name{flex:2; font-family:inherit; text-align:left;}
   .inv-row .i-qty{width:58px; flex-shrink:0;}
   .inv-row .i-plus{font-size:14px; color:var(--txt-faint); font-weight:700; flex-shrink:0;}
+  .inv-row .i-op-btn{background:var(--surface-2); border:1px solid var(--line); border-radius:7px; width:26px; height:34px; font-size:17px; color:var(--blue); cursor:pointer; padding:0;}
+  .inv-row .i-op-btn:active{background:var(--blue); color:#fff;}
   .inv-row .i-total{width:42px; flex-shrink:0; font-size:14px; font-weight:800; color:var(--blue); text-align:center; background:rgba(74,140,255,.1); border-radius:8px; padding:9px 4px; border:1px solid rgba(74,140,255,.2);}
   .inv-row input:focus{outline:none; border-color:var(--blue);}
   .inv-del{flex-shrink:0; width:30px; height:30px; border-radius:50%; background:var(--surface-2); border:1px solid var(--line); color:var(--txt-faint); font-size:15px; cursor:pointer; line-height:1;}
@@ -438,7 +440,7 @@
       <p>입력한 일정·보고 내용을 모두 지웁니다. (API 키는 유지)</p>
       <button class="btn btn-ghost btn-block" onclick="wipeData()">전체 일정 삭제</button>
     </div>
-    <div style="text-align:center; color:var(--txt-faint); font-size:11px; padding:6px 0 10px;" class="mono">ploom-report · build 0632</div>
+    <div style="text-align:center; color:var(--txt-faint); font-size:11px; padding:6px 0 10px;" class="mono">ploom-report · build 0633</div>
   </main>
 </section>
 
@@ -1671,7 +1673,8 @@ function calcTotal(it){
   const [fa,fb]=invFields();
   const a=parseInt(it[fa])||0, b=parseInt(it[fb])||0;
   if(!a && !b) return null;
-  return invInputMode==='sub' ? (a-b) : (a+b);
+  if(invInputMode==='sub') return (it.op==='+') ? (a+b) : (a-b);
+  return a+b;
 }
 const expandedNotes=new Set();
 function renderInvItems(){
@@ -1695,8 +1698,15 @@ function renderInvItems(){
     };
     const [fa,fb]=invFields();
     const wInp=mk(fa,it[fa]), oInp=mk(fb,it[fb]);
-    const plus=document.createElement('span'); plus.className='i-plus';
-    plus.textContent = invInputMode==='sub' ? '−' : '+';
+    // 연산기호: 총재고−판매 방식에선 탭해서 −(판매)/+(입고) 전환
+    let plus;
+    if(invInputMode==='sub'){
+      plus=document.createElement('button'); plus.className='i-plus i-op-btn';
+      plus.textContent = (it.op==='+') ? '+' : '−';
+      plus.onclick=()=>{ it.op = (it.op==='+')?'-':'+'; plus.textContent=(it.op==='+')?'+':'−'; saveInv(); updateTotal(); };
+    } else {
+      plus=document.createElement('span'); plus.className='i-plus'; plus.textContent='+';
+    }
     const tot=document.createElement('div'); tot.className='i-total';
     const t=calcTotal(it); tot.textContent=t!==null?String(t):'';
     function updateTotal(){ const t2=calcTotal(it); tot.textContent=t2!==null?String(t2):''; renderInv(); }
@@ -1727,7 +1737,25 @@ function renderInvItems(){
     el.appendChild(wrap);
   });
 }
-function saveInvConfirm(){ saveInv(); toast('저장됨 ✓'); }
+function saveInvConfirm(){
+  if(invInputMode==='sub'){
+    // 총재고 −/+ 판매 = 결과 → 결과를 새 총재고로 확정하고 판매칸 비움
+    let changed=false;
+    INV.items.forEach(it=>{
+      const total=parseInt(it.total)||0, sold=parseInt(it.sold)||0;
+      if(total||sold){
+        const result = (it.op==='+') ? (total+sold) : (total-sold);
+        it.total=String(Math.max(0,result)); it.sold=''; it.op='-';   // 다음 입력은 다시 판매(−) 기본
+        changed=true;
+      }
+    });
+    saveInv();
+    if(changed){ renderInvItems(); renderInv(); toast('총재고에 반영됨 ✓'); }
+    else toast('저장됨 ✓');
+  } else {
+    saveInv(); toast('저장됨 ✓');
+  }
+}
 let invMode='end';
 function setInvMode(m){
   invMode=m;
@@ -1750,12 +1778,12 @@ function invText(){
   const d=new Date(); const date=`${d.getMonth()+1}/${d.getDate()}`;
   const itemLines=[];
   const [fa,fb]=invFields();
-  const op = invInputMode==='sub' ? '-' : '+';
   INV.items.forEach(it=>{
     if(!it.name) return;
     const a=parseInt(it[fa])||0, b=parseInt(it[fb])||0;
     if(!a && !b) return;
-    const result = invInputMode==='sub' ? (a-b) : (a+b);
+    const op = invInputMode==='sub' ? (it.op==='+'?'+':'-') : '+';
+    const result = invInputMode==='sub' ? (it.op==='+'?a+b:a-b) : (a+b);
     let line;
     if(invReportMode==='detail'){
       if(a && b) line=`${it.name} ${a} ${op} ${b} = ${result}`;
@@ -1788,38 +1816,18 @@ function renderInv(){
   const el=document.getElementById('invPreview');
   if(el) el.textContent=invText()||'—';
 }
-function todayStr(){ const d=new Date(); return `${d.getFullYear()}-${d.getMonth()+1}-${d.getDate()}`; }
-function markInvClosed(){
-  // 총재고−판매 방식에서 마감을 보냈으면 오늘 날짜를 기록 (다음날 이월 트리거)
-  if(invInputMode==='sub' && invMode==='end') localStorage.setItem('ploomInvClosedDate', todayStr());
-}
-function carryOverIfNewDay(){
-  if(invInputMode!=='sub') return;                       // 총재고−판매 방식만
-  const closed=localStorage.getItem('ploomInvClosedDate');
-  if(!closed || closed===todayStr()) return;             // 마감한 적 없거나 아직 같은 날이면 그대로
-  // 날짜가 바뀜 → 남은(총재고-판매)을 새 총재고로, 판매는 0으로
-  let changed=false;
-  INV.items.forEach(it=>{
-    const total=parseInt(it.total)||0, sold=parseInt(it.sold)||0;
-    if(total||sold){ it.total=String(Math.max(0,total-sold)); it.sold=''; changed=true; }
-  });
-  if(changed){ saveInv(); toast('어제 남은 재고를 총재고로 이월했어요'); }
-  localStorage.removeItem('ploomInvClosedDate');         // 이월 완료 → 트리거 해제
-}
 async function copyInv(){
   const t=invText();
   try{ await navigator.clipboard.writeText(t); }
   catch(e){ const ta=document.createElement('textarea'); ta.value=t; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); }
-  markInvClosed();
   toast('복사됨 · 카톡에 붙여넣기');
 }
 async function shareInv(){
   const t=invText();
   try{
     if(navigator.share) await navigator.share({text:t});
-    else{ await navigator.clipboard.writeText(t); markInvClosed(); toast('공유 미지원 · 복사됨'); return; }
+    else{ await navigator.clipboard.writeText(t); toast('공유 미지원 · 복사됨'); return; }
   }catch(e){ if(e&&e.name==='AbortError') return; }
-  markInvClosed();
 }
 
 /* ═══════════ 탭 + 토스트 ═══════════ */
@@ -1828,7 +1836,7 @@ function switchView(v){
   document.getElementById('view-'+v).classList.add('on');
   document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on', b.dataset.view===v));
   window.scrollTo(0,0);
-  if(v==='inventory'){ carryOverIfNewDay(); renderInvItems(); renderInv(); }
+  if(v==="inventory"){ renderInvItems(); renderInv(); }
 }
 let toastT;
 function toast(msg){
@@ -1860,7 +1868,6 @@ window.addEventListener('DOMContentLoaded',()=>{
   document.getElementById('invModeAdd').classList.toggle('on', invInputMode==='add');
   document.getElementById('invModeSub').classList.toggle('on', invInputMode==='sub');
   applyInvHeader(); applyInvReportLabels();
-  carryOverIfNewDay();
   renderInvItems(); renderInv();
   document.getElementById('dayRepOff').classList.toggle('on', !dayReportOn);
   document.getElementById('dayRepOn').classList.toggle('on', dayReportOn);
