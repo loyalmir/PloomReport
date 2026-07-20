@@ -438,7 +438,7 @@
       <p>입력한 일정·보고 내용을 모두 지웁니다. (API 키는 유지)</p>
       <button class="btn btn-ghost btn-block" onclick="wipeData()">전체 일정 삭제</button>
     </div>
-    <div style="text-align:center; color:var(--txt-faint); font-size:11px; padding:6px 0 10px;" class="mono">ploom-report · build 0631</div>
+    <div style="text-align:center; color:var(--txt-faint); font-size:11px; padding:6px 0 10px;" class="mono">ploom-report · build 0632</div>
   </main>
 </section>
 
@@ -1788,18 +1788,38 @@ function renderInv(){
   const el=document.getElementById('invPreview');
   if(el) el.textContent=invText()||'—';
 }
+function todayStr(){ const d=new Date(); return `${d.getFullYear()}-${d.getMonth()+1}-${d.getDate()}`; }
+function markInvClosed(){
+  // 총재고−판매 방식에서 마감을 보냈으면 오늘 날짜를 기록 (다음날 이월 트리거)
+  if(invInputMode==='sub' && invMode==='end') localStorage.setItem('ploomInvClosedDate', todayStr());
+}
+function carryOverIfNewDay(){
+  if(invInputMode!=='sub') return;                       // 총재고−판매 방식만
+  const closed=localStorage.getItem('ploomInvClosedDate');
+  if(!closed || closed===todayStr()) return;             // 마감한 적 없거나 아직 같은 날이면 그대로
+  // 날짜가 바뀜 → 남은(총재고-판매)을 새 총재고로, 판매는 0으로
+  let changed=false;
+  INV.items.forEach(it=>{
+    const total=parseInt(it.total)||0, sold=parseInt(it.sold)||0;
+    if(total||sold){ it.total=String(Math.max(0,total-sold)); it.sold=''; changed=true; }
+  });
+  if(changed){ saveInv(); toast('어제 남은 재고를 총재고로 이월했어요'); }
+  localStorage.removeItem('ploomInvClosedDate');         // 이월 완료 → 트리거 해제
+}
 async function copyInv(){
   const t=invText();
   try{ await navigator.clipboard.writeText(t); }
   catch(e){ const ta=document.createElement('textarea'); ta.value=t; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); }
+  markInvClosed();
   toast('복사됨 · 카톡에 붙여넣기');
 }
 async function shareInv(){
   const t=invText();
   try{
     if(navigator.share) await navigator.share({text:t});
-    else{ await navigator.clipboard.writeText(t); toast('공유 미지원 · 복사됨'); return; }
+    else{ await navigator.clipboard.writeText(t); markInvClosed(); toast('공유 미지원 · 복사됨'); return; }
   }catch(e){ if(e&&e.name==='AbortError') return; }
+  markInvClosed();
 }
 
 /* ═══════════ 탭 + 토스트 ═══════════ */
@@ -1808,6 +1828,7 @@ function switchView(v){
   document.getElementById('view-'+v).classList.add('on');
   document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on', b.dataset.view===v));
   window.scrollTo(0,0);
+  if(v==='inventory'){ carryOverIfNewDay(); renderInvItems(); renderInv(); }
 }
 let toastT;
 function toast(msg){
@@ -1839,6 +1860,7 @@ window.addEventListener('DOMContentLoaded',()=>{
   document.getElementById('invModeAdd').classList.toggle('on', invInputMode==='add');
   document.getElementById('invModeSub').classList.toggle('on', invInputMode==='sub');
   applyInvHeader(); applyInvReportLabels();
+  carryOverIfNewDay();
   renderInvItems(); renderInv();
   document.getElementById('dayRepOff').classList.toggle('on', !dayReportOn);
   document.getElementById('dayRepOn').classList.toggle('on', dayReportOn);
