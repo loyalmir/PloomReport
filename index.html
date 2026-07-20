@@ -276,6 +276,7 @@
       <div class="seg" style="margin-bottom:14px;">
         <button id="invSegStart" onclick="setInvMode('start')">시작보고</button>
         <button id="invSegEnd" class="on" onclick="setInvMode('end')">마감보고</button>
+        <button id="invSegNoon" onclick="setInvMode('noon')">오후</button>
       </div>
       <div style="display:flex; gap:9px; margin-bottom:12px;">
         <div style="flex:1;">
@@ -288,7 +289,7 @@
         </div>
       </div>
     </div>
-    <div class="panel">
+    <div class="panel" id="invItemsPanel">
       <h3>재고 항목</h3>
       <div id="invHeader" style="display:flex; gap:5px; font-size:11px; font-weight:700; color:var(--txt-faint); margin-bottom:6px; padding:0 2px;">
         <span style="flex:2; min-width:0;">항목명</span>
@@ -306,7 +307,7 @@
       </div>
     </div>
     <div class="panel">
-      <div class="seg" style="margin-bottom:12px;">
+      <div class="seg" style="margin-bottom:12px;" id="invReportToggle">
         <button id="invDetailBtn" onclick="setInvReport('detail')">상세 (38+4=42)</button>
         <button id="invTotalBtn" class="on" onclick="setInvReport('total')">총량 (42)</button>
       </div>
@@ -437,7 +438,7 @@
       <p>입력한 일정·보고 내용을 모두 지웁니다. (API 키는 유지)</p>
       <button class="btn btn-ghost btn-block" onclick="wipeData()">전체 일정 삭제</button>
     </div>
-    <div style="text-align:center; color:var(--txt-faint); font-size:11px; padding:6px 0 10px;" class="mono">ploom-report · build 0630</div>
+    <div style="text-align:center; color:var(--txt-faint); font-size:11px; padding:6px 0 10px;" class="mono">ploom-report · build 0631</div>
   </main>
 </section>
 
@@ -561,7 +562,7 @@
   </button>
   <button data-view="inventory" onclick="switchView('inventory')">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="18" rx="2"/><path d="M8 3v18M2 9h20M2 15h20"/></svg>
-    마감재고
+    보고
   </button>
   <button data-view="schedule" onclick="switchView('schedule')">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
@@ -1732,11 +1733,20 @@ function setInvMode(m){
   invMode=m;
   document.getElementById('invSegStart').classList.toggle('on',m==='start');
   document.getElementById('invSegEnd').classList.toggle('on',m==='end');
+  document.getElementById('invSegNoon').classList.toggle('on',m==='noon');
+  // 오후 모드: 재고 항목·입력방식 패널 숨김 (팀명만 있으면 됨)
+  const itemsPanel=document.getElementById('invItemsPanel');
+  const repToggle=document.getElementById('invReportToggle');
+  if(itemsPanel) itemsPanel.style.display = m==='noon'?'none':'';
+  if(repToggle) repToggle.style.display = m==='noon'?'none':'';
   renderInv();
 }
 function invText(){
   const team=(document.getElementById('invTeam')||{}).value||'';
   const name=(document.getElementById('invName')||{}).value||'';
+  if(invMode==='noon'){
+    return team ? `${team} 오후 세일즈 시작했습니다.` : '오후 세일즈 시작했습니다.';
+  }
   const d=new Date(); const date=`${d.getMonth()+1}/${d.getDate()}`;
   const itemLines=[];
   const [fa,fb]=invFields();
