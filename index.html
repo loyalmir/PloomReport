@@ -279,8 +279,9 @@
         <button id="invSegStart" onclick="setInvMode('start')">시작보고</button>
         <button id="invSegEnd" class="on" onclick="setInvMode('end')">마감보고</button>
         <button id="invSegNoon" onclick="setInvMode('noon')">오후</button>
+        <button id="invSegMove" onclick="setInvMode('move')">점포이동</button>
       </div>
-      <div style="display:flex; gap:9px; margin-bottom:12px;">
+      <div style="display:flex; gap:9px; margin-bottom:12px;" id="invTeamRow">
         <div style="flex:1;">
           <label style="font-size:12px; font-weight:700; color:var(--txt-dim); display:block; margin-bottom:6px;">팀명</label>
           <input type="text" id="invTeam" placeholder="예) 3팀" oninput="renderInv()">
@@ -289,6 +290,25 @@
           <label style="font-size:12px; font-weight:700; color:var(--txt-dim); display:block; margin-bottom:6px;">이름</label>
           <input type="text" id="invName" placeholder="예) 김건하" oninput="renderInv()">
         </div>
+      </div>
+    </div>
+    <div class="panel" id="invMovePanel" style="display:none;">
+      <h3>점포 이동 보고</h3>
+      <p>해당하는 칸만 채우세요. 비운 줄은 보고에 안 나갑니다.</p>
+      <div class="field">
+        <label>원점포 <span style="color:var(--txt-faint); font-weight:500;">(필수)</span></label>
+        <input type="text" id="moveOrigin" list="storeList1" placeholder="일정에서 고르거나 직접 입력" oninput="renderInv()">
+        <datalist id="storeList1"></datalist>
+      </div>
+      <div class="field">
+        <label>이동 원점포 <span style="color:var(--txt-faint); font-weight:500;">(컨펌 받은 경우)</span></label>
+        <input type="text" id="moveTo" list="storeList2" placeholder="일정에서 고르거나 직접 입력" oninput="renderInv()">
+        <datalist id="storeList2"></datalist>
+      </div>
+      <div class="field">
+        <label>이동 보고 점포 <span style="color:var(--txt-faint); font-weight:500;">(현장에서 또 이동한 경우)</span></label>
+        <input type="text" id="moveReport" list="storeList3" placeholder="일정에서 고르거나 직접 입력" oninput="renderInv()">
+        <datalist id="storeList3"></datalist>
       </div>
     </div>
     <div class="panel" id="invItemsPanel">
@@ -440,7 +460,7 @@
       <p>입력한 일정·보고 내용을 모두 지웁니다. (API 키는 유지)</p>
       <button class="btn btn-ghost btn-block" onclick="wipeData()">전체 일정 삭제</button>
     </div>
-    <div style="text-align:center; color:var(--txt-faint); font-size:11px; padding:6px 0 10px;" class="mono">ploom-report · build 0635</div>
+    <div style="text-align:center; color:var(--txt-faint); font-size:11px; padding:6px 0 10px;" class="mono">ploom-report · build 0636</div>
   </main>
 </section>
 
@@ -1762,12 +1782,37 @@ function setInvMode(m){
   document.getElementById('invSegStart').classList.toggle('on',m==='start');
   document.getElementById('invSegEnd').classList.toggle('on',m==='end');
   document.getElementById('invSegNoon').classList.toggle('on',m==='noon');
-  // 오후 모드: 재고 항목·입력방식 패널 숨김 (팀명만 있으면 됨)
+  document.getElementById('invSegMove').classList.toggle('on',m==='move');
   const itemsPanel=document.getElementById('invItemsPanel');
   const repToggle=document.getElementById('invReportToggle');
-  if(itemsPanel) itemsPanel.style.display = m==='noon'?'none':'';
-  if(repToggle) repToggle.style.display = m==='noon'?'none':'';
+  const movePanel=document.getElementById('invMovePanel');
+  const teamRow=document.getElementById('invTeamRow');
+  // 오후·점포이동: 재고 항목 패널 숨김
+  const hideItems = (m==='noon'||m==='move');
+  if(itemsPanel) itemsPanel.style.display = hideItems?'none':'';
+  if(repToggle) repToggle.style.display = hideItems?'none':'';
+  if(movePanel) movePanel.style.display = (m==='move')?'':'none';
+  if(teamRow) teamRow.style.display = (m==='move')?'none':'';   // 점포이동은 팀·이름 안 씀
+  if(m==='move') fillStoreDatalists();
   renderInv();
+}
+function fillStoreDatalists(){
+  // 일정에 있는 매장 목록을 후보로 제공 (직접 입력도 가능)
+  const names=[...new Set(visits().map(v=>`${v.brand} ${v.store}`.trim()).filter(Boolean))].sort();
+  const opts=names.map(n=>`<option value="${esc(n)}">`).join('');
+  ['storeList1','storeList2','storeList3'].forEach(id=>{
+    const dl=document.getElementById(id); if(dl) dl.innerHTML=opts;
+  });
+}
+function moveText(){
+  const o=(document.getElementById('moveOrigin')||{}).value||'';
+  const t=(document.getElementById('moveTo')||{}).value||'';
+  const r=(document.getElementById('moveReport')||{}).value||'';
+  const lines=[];
+  if(o.trim()) lines.push(`원점포 : ${o.trim()}`);
+  if(t.trim()) lines.push(`이동 원점포 : ${t.trim()}`);
+  if(r.trim()) lines.push(`이동 보고 점포 : ${r.trim()}`);
+  return lines.join('\n');
 }
 function invText(){
   const team=(document.getElementById('invTeam')||{}).value||'';
@@ -1775,6 +1820,7 @@ function invText(){
   if(invMode==='noon'){
     return team ? `${team} 오후 세일즈 시작했습니다.` : '오후 세일즈 시작했습니다.';
   }
+  if(invMode==='move'){ return moveText(); }
   const d=new Date(); const date=`${d.getMonth()+1}/${d.getDate()}`;
   const itemLines=[];
   const [fa,fb]=invFields();
