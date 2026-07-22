@@ -236,13 +236,6 @@
   .ownermsg{position:fixed; left:50%; bottom:0; transform:translateX(-50%); width:100%; max-width:480px; background:var(--ink-2); border-radius:20px 20px 0 0; border:1px solid var(--line); border-bottom:none; padding:20px 18px calc(20px + env(safe-area-inset-bottom)); z-index:81; display:none;}
   .ownermsg.open{display:block;}
   .ownermsg textarea{background:var(--surface); border:1px solid var(--line); border-radius:var(--r-sm); color:var(--txt); font-family:inherit; padding:12px; resize:vertical;}
-  .store-pick{position:relative;}
-  .sug-list{display:none; position:absolute; left:0; right:0; top:calc(100% + 4px); background:var(--surface-2); border:1px solid var(--line); border-radius:var(--r-sm); max-height:220px; overflow-y:auto; z-index:30; box-shadow:0 10px 30px rgba(0,0,0,.45);}
-  .sug-list.open{display:block;}
-  .sug-item{padding:11px 13px; font-size:14px; color:var(--txt); cursor:pointer; border-bottom:1px solid var(--line-soft);}
-  .sug-item:last-child{border-bottom:none;}
-  .sug-item:active{background:var(--blue); color:#fff;}
-  .sug-empty{padding:11px 13px; font-size:13px; color:var(--txt-faint);}
   .toast{
     position:fixed; bottom:96px; left:50%; transform:translateX(-50%) translateY(20px);
     background:var(--txt); color:var(--ink); padding:11px 20px; border-radius:24px; font-weight:800; font-size:14px;
@@ -301,31 +294,20 @@
     </div>
     <div class="panel" id="invMovePanel" style="display:none;">
       <h3>점포 이동 보고</h3>
-      <p>칸을 탭하면 일정에 있는 매장이 뜹니다. 목록에 없으면 직접 입력하세요.</p>
+      <p>매장에서 지정하거나 직접 입력하세요. 비운 줄은 보고에 안 나갑니다.</p>
       <div class="field">
         <label>원점포 <span style="color:var(--txt-faint); font-weight:500;">(필수)</span></label>
-        <div class="store-pick">
-          <input type="text" id="moveOrigin" placeholder="탭해서 고르거나 직접 입력" autocomplete="off"
-            oninput="renderInv(); filterStoreSug('moveOrigin')" onfocus="showStoreSug('moveOrigin')">
-          <div class="sug-list" id="sug_moveOrigin"></div>
-        </div>
+        <input type="text" id="moveOrigin" placeholder="직접 입력 또는 매장에서 지정" oninput="saveMoveFields()">
       </div>
       <div class="field">
         <label>이동 원점포 <span style="color:var(--txt-faint); font-weight:500;">(컨펌 받은 경우)</span></label>
-        <div class="store-pick">
-          <input type="text" id="moveTo" placeholder="탭해서 고르거나 직접 입력" autocomplete="off"
-            oninput="renderInv(); filterStoreSug('moveTo')" onfocus="showStoreSug('moveTo')">
-          <div class="sug-list" id="sug_moveTo"></div>
-        </div>
+        <input type="text" id="moveTo" placeholder="직접 입력 또는 매장에서 지정" oninput="saveMoveFields()">
       </div>
       <div class="field">
         <label>이동 보고 점포 <span style="color:var(--txt-faint); font-weight:500;">(현장에서 또 이동한 경우)</span></label>
-        <div class="store-pick">
-          <input type="text" id="moveReport" placeholder="탭해서 고르거나 직접 입력" autocomplete="off"
-            oninput="renderInv(); filterStoreSug('moveReport')" onfocus="showStoreSug('moveReport')">
-          <div class="sug-list" id="sug_moveReport"></div>
-        </div>
+        <input type="text" id="moveReport" placeholder="직접 입력 또는 매장에서 지정" oninput="saveMoveFields()">
       </div>
+      <button class="btn btn-ghost btn-block" onclick="clearMoveFields()" style="margin-top:4px;">비우기</button>
     </div>
     <div class="panel" id="invItemsPanel">
       <h3>재고 항목</h3>
@@ -476,7 +458,7 @@
       <p>입력한 일정·보고 내용을 모두 지웁니다. (API 키는 유지)</p>
       <button class="btn btn-ghost btn-block" onclick="wipeData()">전체 일정 삭제</button>
     </div>
-    <div style="text-align:center; color:var(--txt-faint); font-size:11px; padding:6px 0 10px;" class="mono">ploom-report · build 0637</div>
+    <div style="text-align:center; color:var(--txt-faint); font-size:11px; padding:6px 0 10px;" class="mono">ploom-report · build 0638</div>
   </main>
 </section>
 
@@ -490,6 +472,7 @@
     <div style="display:flex; gap:7px; flex-wrap:wrap; margin-top:6px; align-items:center;">
       <button class="code-btn" id="codeBtn" style="display:none;" onclick="copyStoreCode()"><span id="codeBtnText">—</span> 탭하여 복사</button>
       <button class="code-btn" id="ownerMsgBtn" onclick="openOwnerMsg()" style="border-color:var(--kakao); color:var(--kakao);">✉️ 점주 문자</button>
+      <button class="code-btn" onclick="openMovePick()" style="border-color:var(--coral); color:var(--coral);">📍 이동보고</button>
     </div>
   </div>
   <div class="sheet-body">
@@ -619,6 +602,16 @@
   <button class="pv-nav pv-next" onclick="stepPhoto(event,1)">›</button>
   <div class="pv-count" id="pvCount"></div>
   <button class="pv-save" onclick="savePhotoToDevice(event)">저장</button>
+</div>
+
+<div class="ownermsg-bg" id="movePickBg" onclick="closeMovePick()"></div>
+<div class="ownermsg" id="movePick">
+  <div class="preview-label" style="margin-bottom:6px;"><span class="live"></span>이동 보고에 넣기</div>
+  <div style="font-size:17px; font-weight:800; margin-bottom:14px;" id="movePickName">—</div>
+  <button class="btn btn-primary btn-block" onclick="setMoveSlot('origin')" style="margin-bottom:9px;">원점포로 지정</button>
+  <button class="btn btn-ghost btn-block" onclick="setMoveSlot('to')" style="margin-bottom:9px;">이동 원점포로 지정</button>
+  <button class="btn btn-ghost btn-block" onclick="setMoveSlot('report')" style="margin-bottom:14px;">이동 보고 점포로 지정</button>
+  <button class="btn btn-ghost btn-block" onclick="closeMovePick()">닫기</button>
 </div>
 
 <div class="ownermsg-bg" id="ownerMsgBg" onclick="closeOwnerMsg()"></div>
@@ -1809,41 +1802,50 @@ function setInvMode(m){
   if(repToggle) repToggle.style.display = hideItems?'none':'';
   if(movePanel) movePanel.style.display = (m==='move')?'':'none';
   if(teamRow) teamRow.style.display = (m==='move')?'none':'';   // 점포이동은 팀·이름 안 씀
-
+  if(m==='move') loadMoveFields();
   renderInv();
 }
-function storeCandidates(){
-  return [...new Set(visits().map(v=>`${v.brand} ${v.store}`.trim()).filter(Boolean))].sort();
-}
-function showStoreSug(inputId){ filterStoreSug(inputId, true); }
-function filterStoreSug(inputId, showAll){
-  const inp=document.getElementById(inputId);
-  const box=document.getElementById('sug_'+inputId);
-  if(!inp||!box) return;
-  const q=(inp.value||'').trim().toLowerCase();
-  let list=storeCandidates();
-  if(q && !showAll) list=list.filter(n=>n.toLowerCase().includes(q));
-  if(!list.length){
-    box.innerHTML='<div class="sug-empty">일정에 매장이 없어요 · 직접 입력하세요</div>';
-  } else {
-    box.innerHTML=list.map(n=>`<div class="sug-item" onmousedown="pickStore('${inputId}','${esc(n).replace(/'/g,"\\'")}')" ontouchstart="pickStore('${inputId}','${esc(n).replace(/'/g,"\\'")}')">${esc(n)}</div>`).join('');
-  }
-  box.classList.add('open');
-}
-function pickStore(inputId, name){
-  const inp=document.getElementById(inputId);
-  if(inp){ inp.value=name; inp.blur(); }
-  hideStoreSug(inputId);
+function moveFields(){ try{ return JSON.parse(localStorage.getItem('ploomMove')||'{}'); }catch(e){ return {}; } }
+function saveMoveFields(){
+  const m={
+    origin:(document.getElementById('moveOrigin')||{}).value||'',
+    to:(document.getElementById('moveTo')||{}).value||'',
+    report:(document.getElementById('moveReport')||{}).value||''
+  };
+  localStorage.setItem('ploomMove', JSON.stringify(m));
   renderInv();
 }
-function hideStoreSug(inputId){
-  const box=document.getElementById('sug_'+inputId);
-  if(box) box.classList.remove('open');
+function loadMoveFields(){
+  const m=moveFields();
+  const set=(id,v)=>{ const el=document.getElementById(id); if(el) el.value=v||''; };
+  set('moveOrigin',m.origin); set('moveTo',m.to); set('moveReport',m.report);
 }
-// 바깥을 누르면 목록 닫기
-document.addEventListener('click',e=>{
-  if(!e.target.closest('.store-pick')) ['moveOrigin','moveTo','moveReport'].forEach(hideStoreSug);
-});
+function clearMoveFields(){
+  localStorage.setItem('ploomMove','{}');
+  loadMoveFields(); renderInv(); toast('비웠습니다');
+}
+// 매장 편집창에서 이동보고 대상 지정
+function setMoveSlot(slot){
+  const v=DATA[curId]; if(!v) return;
+  const name=`${v.brand} ${v.store}`.trim();
+  const m=moveFields();
+  m[slot]=name;
+  localStorage.setItem('ploomMove', JSON.stringify(m));
+  loadMoveFields();
+  closeMovePick();
+  const label = slot==='origin'?'원점포':(slot==='to'?'이동 원점포':'이동 보고 점포');
+  toast(`${label} → ${name}`);
+}
+function openMovePick(){
+  const v=DATA[curId]; if(!v) return;
+  document.getElementById('movePickName').textContent=`${v.brand} ${v.store}`.trim();
+  document.getElementById('movePickBg').classList.add('open');
+  document.getElementById('movePick').classList.add('open');
+}
+function closeMovePick(){
+  document.getElementById('movePickBg').classList.remove('open');
+  document.getElementById('movePick').classList.remove('open');
+}
 function moveText(){
   const o=(document.getElementById('moveOrigin')||{}).value||'';
   const t=(document.getElementById('moveTo')||{}).value||'';
@@ -1956,6 +1958,7 @@ window.addEventListener('DOMContentLoaded',()=>{
   document.getElementById('invModeAdd').classList.toggle('on', invInputMode==='add');
   document.getElementById('invModeSub').classList.toggle('on', invInputMode==='sub');
   applyInvHeader(); applyInvReportLabels();
+  loadMoveFields();
   renderInvItems(); renderInv();
   document.getElementById('dayRepOff').classList.toggle('on', !dayReportOn);
   document.getElementById('dayRepOn').classList.toggle('on', dayReportOn);
