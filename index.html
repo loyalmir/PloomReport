@@ -296,6 +296,10 @@
       <h3>점포 이동 보고</h3>
       <p>매장에서 지정하거나 직접 입력하세요. 비운 줄은 보고에 안 나갑니다.</p>
       <div class="field">
+        <label>맨 위 <span style="color:var(--txt-faint); font-weight:500;">(대괄호 안에 들어갑니다)</span></label>
+        <input type="text" id="moveHead" placeholder="예) 12팀 10:00 출근" oninput="saveMoveFields()">
+      </div>
+      <div class="field">
         <label>원점포 <span style="color:var(--txt-faint); font-weight:500;">(필수)</span></label>
         <input type="text" id="moveOrigin" placeholder="직접 입력 또는 매장에서 지정" oninput="saveMoveFields()">
       </div>
@@ -306,6 +310,10 @@
       <div class="field">
         <label>이동 보고 점포 <span style="color:var(--txt-faint); font-weight:500;">(현장에서 또 이동한 경우)</span></label>
         <input type="text" id="moveReport" placeholder="직접 입력 또는 매장에서 지정" oninput="saveMoveFields()">
+      </div>
+      <div class="field">
+        <label>추가 내용 <span style="color:var(--txt-faint); font-weight:500;">(맨 아래 · 선택)</span></label>
+        <textarea id="moveMemo" placeholder="필요한 내용을 자유롭게 적으세요." oninput="saveMoveFields()"></textarea>
       </div>
       <button class="btn btn-ghost btn-block" onclick="clearMoveFields()" style="margin-top:4px;">비우기</button>
     </div>
@@ -458,7 +466,7 @@
       <p>입력한 일정·보고 내용을 모두 지웁니다. (API 키는 유지)</p>
       <button class="btn btn-ghost btn-block" onclick="wipeData()">전체 일정 삭제</button>
     </div>
-    <div style="text-align:center; color:var(--txt-faint); font-size:11px; padding:6px 0 10px;" class="mono">ploom-report · build 0638</div>
+    <div style="text-align:center; color:var(--txt-faint); font-size:11px; padding:6px 0 10px;" class="mono">ploom-report · build 0640</div>
   </main>
 </section>
 
@@ -471,8 +479,8 @@
     <div class="meta" id="edMeta">—</div>
     <div style="display:flex; gap:7px; flex-wrap:wrap; margin-top:6px; align-items:center;">
       <button class="code-btn" id="codeBtn" style="display:none;" onclick="copyStoreCode()"><span id="codeBtnText">—</span> 탭하여 복사</button>
-      <button class="code-btn" id="ownerMsgBtn" onclick="openOwnerMsg()" style="border-color:var(--kakao); color:var(--kakao);">✉️ 점주 문자</button>
-      <button class="code-btn" onclick="openMovePick()" style="border-color:var(--coral); color:var(--coral);">📍 이동보고</button>
+      <button class="code-btn" id="ownerMsgBtn" onclick="openOwnerMsg()" style="border-color:var(--kakao); color:var(--kakao);">✉️ 문자</button>
+      <button class="code-btn" onclick="openMovePick()" style="border-color:var(--coral); color:var(--coral);">📍 이동</button>
     </div>
   </div>
   <div class="sheet-body">
@@ -1808,9 +1816,11 @@ function setInvMode(m){
 function moveFields(){ try{ return JSON.parse(localStorage.getItem('ploomMove')||'{}'); }catch(e){ return {}; } }
 function saveMoveFields(){
   const m={
+    head:(document.getElementById('moveHead')||{}).value||'',
     origin:(document.getElementById('moveOrigin')||{}).value||'',
     to:(document.getElementById('moveTo')||{}).value||'',
-    report:(document.getElementById('moveReport')||{}).value||''
+    report:(document.getElementById('moveReport')||{}).value||'',
+    memo:(document.getElementById('moveMemo')||{}).value||''
   };
   localStorage.setItem('ploomMove', JSON.stringify(m));
   renderInv();
@@ -1818,7 +1828,7 @@ function saveMoveFields(){
 function loadMoveFields(){
   const m=moveFields();
   const set=(id,v)=>{ const el=document.getElementById(id); if(el) el.value=v||''; };
-  set('moveOrigin',m.origin); set('moveTo',m.to); set('moveReport',m.report);
+  set('moveHead',m.head); set('moveOrigin',m.origin); set('moveTo',m.to); set('moveReport',m.report); set('moveMemo',m.memo);
 }
 function clearMoveFields(){
   localStorage.setItem('ploomMove','{}');
@@ -1847,13 +1857,17 @@ function closeMovePick(){
   document.getElementById('movePick').classList.remove('open');
 }
 function moveText(){
+  const h=(document.getElementById('moveHead')||{}).value||'';
   const o=(document.getElementById('moveOrigin')||{}).value||'';
   const t=(document.getElementById('moveTo')||{}).value||'';
   const r=(document.getElementById('moveReport')||{}).value||'';
+  const memo=(document.getElementById('moveMemo')||{}).value||'';
   const lines=[];
-  if(o.trim()) lines.push(`원점포 : ${o.trim()}`);
-  if(t.trim()) lines.push(`이동 원점포 : ${t.trim()}`);
-  if(r.trim()) lines.push(`이동 보고 점포 : ${r.trim()}`);
+  if(h.trim()) lines.push(`[${h.trim()}]`);
+  if(o.trim()) lines.push(`- 원점포 : ${o.trim()}`);
+  if(t.trim()) lines.push(`- 이동 원점포 : ${t.trim()}`);
+  if(r.trim()) lines.push(`- 이동 보고 점포 : ${r.trim()}`);
+  if(memo.trim()){ lines.push(''); lines.push(memo.trim()); }
   return lines.join('\n');
 }
 function invText(){
