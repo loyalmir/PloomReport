@@ -236,6 +236,13 @@
   .ownermsg{position:fixed; left:50%; bottom:0; transform:translateX(-50%); width:100%; max-width:480px; background:var(--ink-2); border-radius:20px 20px 0 0; border:1px solid var(--line); border-bottom:none; padding:20px 18px calc(20px + env(safe-area-inset-bottom)); z-index:81; display:none;}
   .ownermsg.open{display:block;}
   .ownermsg textarea{background:var(--surface); border:1px solid var(--line); border-radius:var(--r-sm); color:var(--txt); font-family:inherit; padding:12px; resize:vertical;}
+  .store-pick{position:relative;}
+  .sug-list{display:none; position:absolute; left:0; right:0; top:calc(100% + 4px); background:var(--surface-2); border:1px solid var(--line); border-radius:var(--r-sm); max-height:220px; overflow-y:auto; z-index:30; box-shadow:0 10px 30px rgba(0,0,0,.45);}
+  .sug-list.open{display:block;}
+  .sug-item{padding:11px 13px; font-size:14px; color:var(--txt); cursor:pointer; border-bottom:1px solid var(--line-soft);}
+  .sug-item:last-child{border-bottom:none;}
+  .sug-item:active{background:var(--blue); color:#fff;}
+  .sug-empty{padding:11px 13px; font-size:13px; color:var(--txt-faint);}
   .toast{
     position:fixed; bottom:96px; left:50%; transform:translateX(-50%) translateY(20px);
     background:var(--txt); color:var(--ink); padding:11px 20px; border-radius:24px; font-weight:800; font-size:14px;
@@ -294,21 +301,30 @@
     </div>
     <div class="panel" id="invMovePanel" style="display:none;">
       <h3>점포 이동 보고</h3>
-      <p>해당하는 칸만 채우세요. 비운 줄은 보고에 안 나갑니다.</p>
+      <p>칸을 탭하면 일정에 있는 매장이 뜹니다. 목록에 없으면 직접 입력하세요.</p>
       <div class="field">
         <label>원점포 <span style="color:var(--txt-faint); font-weight:500;">(필수)</span></label>
-        <input type="text" id="moveOrigin" list="storeList1" placeholder="일정에서 고르거나 직접 입력" oninput="renderInv()">
-        <datalist id="storeList1"></datalist>
+        <div class="store-pick">
+          <input type="text" id="moveOrigin" placeholder="탭해서 고르거나 직접 입력" autocomplete="off"
+            oninput="renderInv(); filterStoreSug('moveOrigin')" onfocus="showStoreSug('moveOrigin')">
+          <div class="sug-list" id="sug_moveOrigin"></div>
+        </div>
       </div>
       <div class="field">
         <label>이동 원점포 <span style="color:var(--txt-faint); font-weight:500;">(컨펌 받은 경우)</span></label>
-        <input type="text" id="moveTo" list="storeList2" placeholder="일정에서 고르거나 직접 입력" oninput="renderInv()">
-        <datalist id="storeList2"></datalist>
+        <div class="store-pick">
+          <input type="text" id="moveTo" placeholder="탭해서 고르거나 직접 입력" autocomplete="off"
+            oninput="renderInv(); filterStoreSug('moveTo')" onfocus="showStoreSug('moveTo')">
+          <div class="sug-list" id="sug_moveTo"></div>
+        </div>
       </div>
       <div class="field">
         <label>이동 보고 점포 <span style="color:var(--txt-faint); font-weight:500;">(현장에서 또 이동한 경우)</span></label>
-        <input type="text" id="moveReport" list="storeList3" placeholder="일정에서 고르거나 직접 입력" oninput="renderInv()">
-        <datalist id="storeList3"></datalist>
+        <div class="store-pick">
+          <input type="text" id="moveReport" placeholder="탭해서 고르거나 직접 입력" autocomplete="off"
+            oninput="renderInv(); filterStoreSug('moveReport')" onfocus="showStoreSug('moveReport')">
+          <div class="sug-list" id="sug_moveReport"></div>
+        </div>
       </div>
     </div>
     <div class="panel" id="invItemsPanel">
@@ -460,7 +476,7 @@
       <p>입력한 일정·보고 내용을 모두 지웁니다. (API 키는 유지)</p>
       <button class="btn btn-ghost btn-block" onclick="wipeData()">전체 일정 삭제</button>
     </div>
-    <div style="text-align:center; color:var(--txt-faint); font-size:11px; padding:6px 0 10px;" class="mono">ploom-report · build 0636</div>
+    <div style="text-align:center; color:var(--txt-faint); font-size:11px; padding:6px 0 10px;" class="mono">ploom-report · build 0637</div>
   </main>
 </section>
 
@@ -1793,17 +1809,41 @@ function setInvMode(m){
   if(repToggle) repToggle.style.display = hideItems?'none':'';
   if(movePanel) movePanel.style.display = (m==='move')?'':'none';
   if(teamRow) teamRow.style.display = (m==='move')?'none':'';   // 점포이동은 팀·이름 안 씀
-  if(m==='move') fillStoreDatalists();
+
   renderInv();
 }
-function fillStoreDatalists(){
-  // 일정에 있는 매장 목록을 후보로 제공 (직접 입력도 가능)
-  const names=[...new Set(visits().map(v=>`${v.brand} ${v.store}`.trim()).filter(Boolean))].sort();
-  const opts=names.map(n=>`<option value="${esc(n)}">`).join('');
-  ['storeList1','storeList2','storeList3'].forEach(id=>{
-    const dl=document.getElementById(id); if(dl) dl.innerHTML=opts;
-  });
+function storeCandidates(){
+  return [...new Set(visits().map(v=>`${v.brand} ${v.store}`.trim()).filter(Boolean))].sort();
 }
+function showStoreSug(inputId){ filterStoreSug(inputId, true); }
+function filterStoreSug(inputId, showAll){
+  const inp=document.getElementById(inputId);
+  const box=document.getElementById('sug_'+inputId);
+  if(!inp||!box) return;
+  const q=(inp.value||'').trim().toLowerCase();
+  let list=storeCandidates();
+  if(q && !showAll) list=list.filter(n=>n.toLowerCase().includes(q));
+  if(!list.length){
+    box.innerHTML='<div class="sug-empty">일정에 매장이 없어요 · 직접 입력하세요</div>';
+  } else {
+    box.innerHTML=list.map(n=>`<div class="sug-item" onmousedown="pickStore('${inputId}','${esc(n).replace(/'/g,"\\'")}')" ontouchstart="pickStore('${inputId}','${esc(n).replace(/'/g,"\\'")}')">${esc(n)}</div>`).join('');
+  }
+  box.classList.add('open');
+}
+function pickStore(inputId, name){
+  const inp=document.getElementById(inputId);
+  if(inp){ inp.value=name; inp.blur(); }
+  hideStoreSug(inputId);
+  renderInv();
+}
+function hideStoreSug(inputId){
+  const box=document.getElementById('sug_'+inputId);
+  if(box) box.classList.remove('open');
+}
+// 바깥을 누르면 목록 닫기
+document.addEventListener('click',e=>{
+  if(!e.target.closest('.store-pick')) ['moveOrigin','moveTo','moveReport'].forEach(hideStoreSug);
+});
 function moveText(){
   const o=(document.getElementById('moveOrigin')||{}).value||'';
   const t=(document.getElementById('moveTo')||{}).value||'';
