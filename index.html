@@ -236,6 +236,12 @@
   .ownermsg{position:fixed; left:50%; bottom:0; transform:translateX(-50%); width:100%; max-width:480px; background:var(--ink-2); border-radius:20px 20px 0 0; border:1px solid var(--line); border-bottom:none; padding:20px 18px calc(20px + env(safe-area-inset-bottom)); z-index:81; display:none;}
   .ownermsg.open{display:block;}
   .ownermsg textarea{background:var(--surface); border:1px solid var(--line); border-radius:var(--r-sm); color:var(--txt); font-family:inherit; padding:12px; resize:vertical;}
+  .move-block{border:1px solid var(--line); border-radius:var(--r-sm); padding:13px; margin-bottom:12px; background:var(--surface);}
+  .move-block.active{border-color:var(--coral); box-shadow:0 0 0 1px rgba(255,107,92,.25);}
+  .mb-head{display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;}
+  .mb-pin{background:none; border:1px solid var(--line); border-radius:7px; padding:5px 11px; font-size:11.5px; font-weight:800; color:var(--txt-faint); cursor:pointer; font-family:inherit;}
+  .move-block.active .mb-pin{border-color:var(--coral); color:var(--coral);}
+  .mb-del{background:var(--surface-2); border:1px solid var(--line); border-radius:50%; width:26px; height:26px; color:var(--txt-faint); font-size:14px; cursor:pointer; line-height:1;}
   .toast{
     position:fixed; bottom:96px; left:50%; transform:translateX(-50%) translateY(20px);
     background:var(--txt); color:var(--ink); padding:11px 20px; border-radius:24px; font-weight:800; font-size:14px;
@@ -294,28 +300,13 @@
     </div>
     <div class="panel" id="invMovePanel" style="display:none;">
       <h3>점포 이동 보고</h3>
-      <p>매장에서 지정하거나 직접 입력하세요. 비운 줄은 보고에 안 나갑니다.</p>
       <div class="field">
-        <label>맨 위 <span style="color:var(--txt-faint); font-weight:500;">(대괄호 안에 들어갑니다)</span></label>
-        <input type="text" id="moveHead" placeholder="예) 12팀 10:00 출근" oninput="saveMoveFields()">
+        <label>제목 <span style="color:var(--txt-faint); font-weight:500;">(맨 위 · 선택)</span></label>
+        <input type="text" id="moveTitle" placeholder="예) ⭐7/23(목) 5조 근무일정" oninput="saveMove()">
       </div>
-      <div class="field">
-        <label>원점포 <span style="color:var(--txt-faint); font-weight:500;">(필수)</span></label>
-        <input type="text" id="moveOrigin" placeholder="직접 입력 또는 매장에서 지정" oninput="saveMoveFields()">
-      </div>
-      <div class="field">
-        <label>이동 원점포 <span style="color:var(--txt-faint); font-weight:500;">(컨펌 받은 경우)</span></label>
-        <input type="text" id="moveTo" placeholder="직접 입력 또는 매장에서 지정" oninput="saveMoveFields()">
-      </div>
-      <div class="field">
-        <label>이동 보고 점포 <span style="color:var(--txt-faint); font-weight:500;">(현장에서 또 이동한 경우)</span></label>
-        <input type="text" id="moveReport" placeholder="직접 입력 또는 매장에서 지정" oninput="saveMoveFields()">
-      </div>
-      <div class="field">
-        <label>추가 내용 <span style="color:var(--txt-faint); font-weight:500;">(맨 아래 · 선택)</span></label>
-        <textarea id="moveMemo" placeholder="필요한 내용을 자유롭게 적으세요." oninput="saveMoveFields()"></textarea>
-      </div>
-      <button class="btn btn-ghost btn-block" onclick="clearMoveFields()" style="margin-top:4px;">비우기</button>
+      <div id="moveBlocks"></div>
+      <button class="btn btn-ghost btn-block" onclick="addMoveBlock()" style="margin-top:6px;">+ 팀 추가</button>
+      <button class="btn btn-ghost btn-block" onclick="clearMove()" style="margin-top:9px;">전체 비우기</button>
     </div>
     <div class="panel" id="invItemsPanel">
       <h3>재고 항목</h3>
@@ -466,7 +457,7 @@
       <p>입력한 일정·보고 내용을 모두 지웁니다. (API 키는 유지)</p>
       <button class="btn btn-ghost btn-block" onclick="wipeData()">전체 일정 삭제</button>
     </div>
-    <div style="text-align:center; color:var(--txt-faint); font-size:11px; padding:6px 0 10px;" class="mono">ploom-report · build 0640</div>
+    <div style="text-align:center; color:var(--txt-faint); font-size:11px; padding:6px 0 10px;" class="mono">ploom-report · build 0641</div>
   </main>
 </section>
 
@@ -615,10 +606,11 @@
 <div class="ownermsg-bg" id="movePickBg" onclick="closeMovePick()"></div>
 <div class="ownermsg" id="movePick">
   <div class="preview-label" style="margin-bottom:6px;"><span class="live"></span>이동 보고에 넣기</div>
-  <div style="font-size:17px; font-weight:800; margin-bottom:14px;" id="movePickName">—</div>
+  <div style="font-size:17px; font-weight:800; margin-bottom:4px;" id="movePickName">—</div>
+  <div style="font-size:13px; color:var(--txt-dim); margin-bottom:14px;" id="movePickTarget">—</div>
   <button class="btn btn-primary btn-block" onclick="setMoveSlot('origin')" style="margin-bottom:9px;">원점포로 지정</button>
-  <button class="btn btn-ghost btn-block" onclick="setMoveSlot('to')" style="margin-bottom:9px;">이동 원점포로 지정</button>
-  <button class="btn btn-ghost btn-block" onclick="setMoveSlot('report')" style="margin-bottom:14px;">이동 보고 점포로 지정</button>
+  <button class="btn btn-ghost btn-block" onclick="setMoveSlot('to')" style="margin-bottom:9px;">이동점포로 지정</button>
+  <button class="btn btn-ghost btn-block" onclick="setMoveSlot('forms')" style="margin-bottom:14px;">폼즈 점포명으로 지정</button>
   <button class="btn btn-ghost btn-block" onclick="closeMovePick()">닫기</button>
 </div>
 
@@ -1813,42 +1805,84 @@ function setInvMode(m){
   if(m==='move') loadMoveFields();
   renderInv();
 }
-function moveFields(){ try{ return JSON.parse(localStorage.getItem('ploomMove')||'{}'); }catch(e){ return {}; } }
-function saveMoveFields(){
-  const m={
-    head:(document.getElementById('moveHead')||{}).value||'',
-    origin:(document.getElementById('moveOrigin')||{}).value||'',
-    to:(document.getElementById('moveTo')||{}).value||'',
-    report:(document.getElementById('moveReport')||{}).value||'',
-    memo:(document.getElementById('moveMemo')||{}).value||''
-  };
-  localStorage.setItem('ploomMove', JSON.stringify(m));
+function loadMove(){
+  try{
+    const m=JSON.parse(localStorage.getItem('ploomMove')||'null');
+    if(m && Array.isArray(m.blocks)) return m;
+  }catch(e){}
+  return {title:'', activeIdx:0, blocks:[newMoveBlock()]};
+}
+function newMoveBlock(){ return {id:Date.now()+Math.floor(Math.random()*1000), head:'', origin:'', to:'', forms:'', note:''}; }
+let MOVE = loadMove();
+function saveMove(){
+  const t=document.getElementById('moveTitle');
+  if(t) MOVE.title=t.value||'';
+  localStorage.setItem('ploomMove', JSON.stringify(MOVE));
   renderInv();
 }
+function updateMoveField(id, field, val){
+  const b=MOVE.blocks.find(x=>x.id===id); if(b){ b[field]=val; saveMove(); }
+}
+function addMoveBlock(){ MOVE.blocks.push(newMoveBlock()); MOVE.activeIdx=MOVE.blocks.length-1; saveMove(); renderMoveBlocks(); }
+function delMoveBlock(id){
+  const b=MOVE.blocks.find(x=>x.id===id);
+  if(!confirm(`"${(b&&b.head)||'이 팀'}" 삭제할까요?`)) return;
+  MOVE.blocks=MOVE.blocks.filter(x=>x.id!==id);
+  if(!MOVE.blocks.length) MOVE.blocks=[newMoveBlock()];
+  if(MOVE.activeIdx>=MOVE.blocks.length) MOVE.activeIdx=MOVE.blocks.length-1;
+  saveMove(); renderMoveBlocks();
+}
+function setMoveActive(idx){ MOVE.activeIdx=idx; saveMove(); renderMoveBlocks(); }
+function clearMove(){
+  if(!confirm('이동 보고 내용을 모두 지울까요?')) return;
+  MOVE={title:'', activeIdx:0, blocks:[newMoveBlock()]};
+  saveMove(); loadMoveFields(); renderMoveBlocks(); toast('비웠습니다');
+}
 function loadMoveFields(){
-  const m=moveFields();
-  const set=(id,v)=>{ const el=document.getElementById(id); if(el) el.value=v||''; };
-  set('moveHead',m.head); set('moveOrigin',m.origin); set('moveTo',m.to); set('moveReport',m.report); set('moveMemo',m.memo);
+  const t=document.getElementById('moveTitle'); if(t) t.value=MOVE.title||'';
+  renderMoveBlocks();
 }
-function clearMoveFields(){
-  localStorage.setItem('ploomMove','{}');
-  loadMoveFields(); renderInv(); toast('비웠습니다');
+function renderMoveBlocks(){
+  const el=document.getElementById('moveBlocks'); if(!el) return;
+  el.innerHTML='';
+  MOVE.blocks.forEach((b,idx)=>{
+    const active = idx===MOVE.activeIdx;
+    const wrap=document.createElement('div');
+    wrap.className='move-block'+(active?' active':'');
+    wrap.innerHTML=`
+      <div class="mb-head">
+        <button class="mb-pin" onclick="setMoveActive(${idx})">${active?'● 지정 대상':'○ 지정 대상으로'}</button>
+        <button class="mb-del" onclick="delMoveBlock(${b.id})">×</button>
+      </div>
+      <div class="field"><label>맨 위 <span style="color:var(--txt-faint); font-weight:500;">(대괄호 자동)</span></label>
+        <input type="text" value="${esc(b.head)}" placeholder="예) 12팀 10:00 출근" oninput="updateMoveField(${b.id},'head',this.value)"></div>
+      <div class="field"><label>원점포</label>
+        <input type="text" value="${esc(b.origin)}" placeholder="직접 입력 또는 매장에서 지정" oninput="updateMoveField(${b.id},'origin',this.value)"></div>
+      <div class="field"><label>이동점포 <span style="color:var(--txt-faint); font-weight:500;">(없으면 비움)</span></label>
+        <input type="text" value="${esc(b.to)}" placeholder="직접 입력 또는 매장에서 지정" oninput="updateMoveField(${b.id},'to',this.value)"></div>
+      <div class="field"><label>폼즈 점포명</label>
+        <input type="text" value="${esc(b.forms)}" placeholder="직접 입력 또는 매장에서 지정" oninput="updateMoveField(${b.id},'forms',this.value)"></div>
+      <div class="field" style="margin-bottom:0;"><label>비고 <span style="color:var(--txt-faint); font-weight:500;">(선택)</span></label>
+        <input type="text" value="${esc(b.note)}" placeholder="예) 이동요청 필수" oninput="updateMoveField(${b.id},'note',this.value)"></div>
+    `;
+    el.appendChild(wrap);
+  });
 }
-// 매장 편집창에서 이동보고 대상 지정
+// 매장 편집창에서 이동보고 대상 지정 (활성 블록에 들어감)
 function setMoveSlot(slot){
   const v=DATA[curId]; if(!v) return;
   const name=`${v.brand} ${v.store}`.trim();
-  const m=moveFields();
-  m[slot]=name;
-  localStorage.setItem('ploomMove', JSON.stringify(m));
-  loadMoveFields();
-  closeMovePick();
-  const label = slot==='origin'?'원점포':(slot==='to'?'이동 원점포':'이동 보고 점포');
-  toast(`${label} → ${name}`);
+  const b=MOVE.blocks[MOVE.activeIdx]; if(!b) return;
+  b[slot]=name;
+  saveMove(); loadMoveFields(); closeMovePick();
+  const label = slot==='origin'?'원점포':(slot==='to'?'이동점포':'폼즈 점포명');
+  toast(`${b.head||('팀'+(MOVE.activeIdx+1))} · ${label} → ${name}`);
 }
 function openMovePick(){
   const v=DATA[curId]; if(!v) return;
   document.getElementById('movePickName').textContent=`${v.brand} ${v.store}`.trim();
+  const b=MOVE.blocks[MOVE.activeIdx];
+  document.getElementById('movePickTarget').textContent = b&&b.head ? `→ ${b.head}` : '→ 첫 번째 팀';
   document.getElementById('movePickBg').classList.add('open');
   document.getElementById('movePick').classList.add('open');
 }
@@ -1857,19 +1891,20 @@ function closeMovePick(){
   document.getElementById('movePick').classList.remove('open');
 }
 function moveText(){
-  const h=(document.getElementById('moveHead')||{}).value||'';
-  const o=(document.getElementById('moveOrigin')||{}).value||'';
-  const t=(document.getElementById('moveTo')||{}).value||'';
-  const r=(document.getElementById('moveReport')||{}).value||'';
-  const memo=(document.getElementById('moveMemo')||{}).value||'';
   const lines=[];
-  if(h.trim()) lines.push(`[${h.trim()}]`);
-  if(o.trim()) lines.push(`- 원점포 : ${o.trim()}`);
-  if(t.trim()) lines.push(`- 이동 원점포 : ${t.trim()}`);
-  if(r.trim()) lines.push(`- 이동 보고 점포 : ${r.trim()}`);
-  if(memo.trim()){ lines.push(''); lines.push(memo.trim()); }
-  return lines.join('\n');
+  if(MOVE.title && MOVE.title.trim()){ lines.push(MOVE.title.trim()); lines.push(''); }
+  MOVE.blocks.forEach((b,i)=>{
+    const seg=[];
+    if(b.head && b.head.trim()) seg.push(`[${b.head.trim()}]`);
+    if(b.origin && b.origin.trim()) seg.push(`- 원점포 : ${b.origin.trim()}`);
+    if(b.to && b.to.trim()) seg.push(`- 이동점포 : ${b.to.trim()}`);
+    if(b.forms && b.forms.trim()) seg.push(`- 폼즈 점포명 : ${b.forms.trim()}`);
+    if(b.note && b.note.trim()) seg.push(` * ${b.note.trim()}`);
+    if(seg.length){ if(lines.length && lines[lines.length-1]!=='') lines.push(''); lines.push(...seg); }
+  });
+  return lines.join('\n').replace(/\s+$/,'');
 }
+
 function invText(){
   const team=(document.getElementById('invTeam')||{}).value||'';
   const name=(document.getElementById('invName')||{}).value||'';
