@@ -281,11 +281,12 @@
   <main>
     <div class="panel">
       <h3>재고 보고</h3>
-      <div class="seg" style="margin-bottom:14px;">
+      <div class="seg" style="margin-bottom:14px; flex-wrap:wrap;">
         <button id="invSegStart" onclick="setInvMode('start')">시작보고</button>
         <button id="invSegEnd" class="on" onclick="setInvMode('end')">마감보고</button>
         <button id="invSegNoon" onclick="setInvMode('noon')">오후</button>
         <button id="invSegMove" onclick="setInvMode('move')">점포이동</button>
+        <button id="invSegTotal" onclick="setInvMode('total_report')">총보고</button>
       </div>
       <div style="display:flex; gap:9px; margin-bottom:12px;" id="invTeamRow">
         <div style="flex:1;">
@@ -307,6 +308,24 @@
       <div id="moveBlocks"></div>
       <button class="btn btn-ghost btn-block" onclick="addMoveBlock()" style="margin-top:6px;">+ 팀 추가</button>
       <button class="btn btn-ghost btn-block" onclick="clearMove()" style="margin-top:9px;">전체 비우기</button>
+    </div>
+    <div class="panel" id="invTotalPanel" style="display:none;">
+      <h3>총 보고</h3>
+      <div class="field">
+        <label>수퍼바이저 이름</label>
+        <input type="text" id="trName" placeholder="예) 1~3팀 김건하" oninput="saveTR()">
+      </div>
+      <div style="font-size:12px; font-weight:800; color:var(--txt-dim); margin:6px 0 8px; letter-spacing:.4px;">세일즈 건수 <span style="color:var(--txt-faint); font-weight:600;">(총합 자동 계산)</span></div>
+      <div id="trSales"></div>
+      <button class="btn btn-ghost btn-block" onclick="addTRSale()" style="margin-bottom:16px;">+ 팀 추가</button>
+      <div style="font-size:12px; font-weight:800; color:var(--txt-dim); margin-bottom:8px; letter-spacing:.4px;">마감재고</div>
+      <div id="trStock"></div>
+      <button class="btn btn-ghost btn-block" onclick="addTRStock()" style="margin-bottom:16px;">+ 재고 항목 추가</button>
+      <div style="font-size:12px; font-weight:800; color:var(--txt-dim); margin-bottom:8px; letter-spacing:.4px;">불출 <span style="color:var(--txt-faint); font-weight:600;">(있을 때만)</span></div>
+      <input type="text" id="trReleaseHead" placeholder="예) 후킷 이대창고 불출" oninput="saveTR()" style="margin-bottom:9px;">
+      <div id="trRelease"></div>
+      <button class="btn btn-ghost btn-block" onclick="addTRRelease()" style="margin-bottom:9px;">+ 불출 항목 추가</button>
+      <button class="btn btn-ghost btn-block" onclick="clearTR()">전체 비우기</button>
     </div>
     <div class="panel" id="invItemsPanel">
       <h3>재고 항목</h3>
@@ -457,7 +476,7 @@
       <p>입력한 일정·보고 내용을 모두 지웁니다. (API 키는 유지)</p>
       <button class="btn btn-ghost btn-block" onclick="wipeData()">전체 일정 삭제</button>
     </div>
-    <div style="text-align:center; color:var(--txt-faint); font-size:11px; padding:6px 0 10px;" class="mono">ploom-report · build 0641</div>
+    <div style="text-align:center; color:var(--txt-faint); font-size:11px; padding:6px 0 10px;" class="mono">ploom-report · build 0642</div>
   </main>
 </section>
 
@@ -1792,17 +1811,22 @@ function setInvMode(m){
   document.getElementById('invSegEnd').classList.toggle('on',m==='end');
   document.getElementById('invSegNoon').classList.toggle('on',m==='noon');
   document.getElementById('invSegMove').classList.toggle('on',m==='move');
+  document.getElementById('invSegTotal').classList.toggle('on',m==='total_report');
   const itemsPanel=document.getElementById('invItemsPanel');
   const repToggle=document.getElementById('invReportToggle');
   const movePanel=document.getElementById('invMovePanel');
+  const totalPanel=document.getElementById('invTotalPanel');
   const teamRow=document.getElementById('invTeamRow');
-  // 오후·점포이동: 재고 항목 패널 숨김
-  const hideItems = (m==='noon'||m==='move');
+  // 오후·점포이동·총보고: 기본 재고 항목 패널 숨김
+  const hideItems = (m==='noon'||m==='move'||m==='total_report');
   if(itemsPanel) itemsPanel.style.display = hideItems?'none':'';
   if(repToggle) repToggle.style.display = hideItems?'none':'';
   if(movePanel) movePanel.style.display = (m==='move')?'':'none';
-  if(teamRow) teamRow.style.display = (m==='move')?'none':'';   // 점포이동은 팀·이름 안 씀
+  if(totalPanel) totalPanel.style.display = (m==='total_report')?'':'none';
+  // 점포이동·총보고는 팀·이름 행 숨김 (자체 입력칸 있음)
+  if(teamRow) teamRow.style.display = (m==='move'||m==='total_report')?'none':'';
   if(m==='move') loadMoveFields();
+  if(m==='total_report') loadTR_fields();
   renderInv();
 }
 function loadMove(){
@@ -1890,6 +1914,110 @@ function closeMovePick(){
   document.getElementById('movePickBg').classList.remove('open');
   document.getElementById('movePick').classList.remove('open');
 }
+/* ═══════════ 총 보고 ═══════════ */
+function loadTR(){
+  try{ const d=JSON.parse(localStorage.getItem('ploomTR')||'null'); if(d) return normalizeTR(d); }catch(e){}
+  return normalizeTR(null);
+}
+function normalizeTR(d){
+  d=d||{};
+  return {
+    name:d.name||'',
+    sales:Array.isArray(d.sales)&&d.sales.length?d.sales:[{id:1,team:'1팀',cnt:''},{id:2,team:'2팀',cnt:''},{id:3,team:'3팀',cnt:''}],
+    stock:Array.isArray(d.stock)&&d.stock.length?d.stock:[{id:1,name:'블랙',qty:''},{id:2,name:'실버',qty:''},{id:3,name:'로즈골드',qty:''},{id:4,name:'네이비',qty:''}],
+    releaseHead:d.releaseHead||'',
+    release:Array.isArray(d.release)?d.release:[]
+  };
+}
+let TR=loadTR(), trNextId=Date.now();
+function saveTR(){
+  const g=id=>{ const el=document.getElementById(id); return el?el.value:''; };
+  TR.name=g('trName'); TR.releaseHead=g('trReleaseHead');
+  localStorage.setItem('ploomTR', JSON.stringify(TR));
+  renderInv();
+}
+function loadTR_fields(){
+  const s=(id,v)=>{ const el=document.getElementById(id); if(el) el.value=v||''; };
+  s('trName',TR.name); s('trReleaseHead',TR.releaseHead);
+  renderTRSales(); renderTRStock(); renderTRRelease();
+}
+function addTRSale(){ TR.sales.push({id:++trNextId,team:'',cnt:''}); persistTR(); renderTRSales(); }
+function delTRSale(id){ TR.sales=TR.sales.filter(x=>x.id!==id); persistTR(); renderTRSales(); }
+function addTRStock(){ TR.stock.push({id:++trNextId,name:'',qty:''}); persistTR(); renderTRStock(); }
+function delTRStock(id){ TR.stock=TR.stock.filter(x=>x.id!==id); persistTR(); renderTRStock(); }
+function addTRRelease(){ TR.release.push({id:++trNextId,name:'',qty:''}); persistTR(); renderTRRelease(); }
+function delTRRelease(id){ TR.release=TR.release.filter(x=>x.id!==id); persistTR(); renderTRRelease(); }
+function updTR(arr,id,field,val){ const it=TR[arr].find(x=>x.id===id); if(it){ it[field]=val; persistTR(); } }
+function persistTR(){ localStorage.setItem('ploomTR', JSON.stringify(TR)); renderInv(); }
+function clearTR(){
+  if(!confirm('총 보고 내용을 모두 지울까요?')) return;
+  localStorage.removeItem('ploomTR'); TR=loadTR(); loadTR_fields(); renderInv(); toast('비웠습니다');
+}
+function renderTRSales(){
+  const el=document.getElementById('trSales'); if(!el) return; el.innerHTML='';
+  TR.sales.forEach(it=>{
+    const row=document.createElement('div'); row.className='inv-row';
+    const nm=document.createElement('input'); nm.className='i-name'; nm.type='text'; nm.placeholder='팀'; nm.value=it.team;
+    nm.oninput=()=>updTR('sales',it.id,'team',nm.value);
+    const qy=document.createElement('input'); qy.className='i-qty'; qy.type='text'; qy.inputMode='numeric'; qy.placeholder='0'; qy.value=it.cnt;
+    qy.style.width='64px';
+    qy.oninput=()=>{ updTR('sales',it.id,'cnt',qy.value); };
+    const unit=document.createElement('span'); unit.className='i-plus'; unit.textContent='건';
+    const del=document.createElement('button'); del.className='inv-del'; del.textContent='×'; del.onclick=()=>delTRSale(it.id);
+    row.append(nm,qy,unit,del); el.appendChild(row);
+  });
+}
+function renderTRStock(){
+  const el=document.getElementById('trStock'); if(!el) return; el.innerHTML='';
+  TR.stock.forEach(it=>{
+    const row=document.createElement('div'); row.className='inv-row';
+    const nm=document.createElement('input'); nm.className='i-name'; nm.type='text'; nm.placeholder='항목명'; nm.value=it.name;
+    nm.oninput=()=>updTR('stock',it.id,'name',nm.value);
+    const qy=document.createElement('input'); qy.className='i-qty'; qy.type='text'; qy.inputMode='numeric'; qy.placeholder='수량'; qy.value=it.qty; qy.style.width='72px';
+    qy.oninput=()=>updTR('stock',it.id,'qty',qy.value);
+    qy.onblur=()=>{ const r=evalQty(qy.value); if(r!==null&&String(r)!==qy.value){ qy.value=String(r); updTR('stock',it.id,'qty',qy.value); } };
+    const del=document.createElement('button'); del.className='inv-del'; del.textContent='×'; del.onclick=()=>delTRStock(it.id);
+    row.append(nm,qy,del); el.appendChild(row);
+  });
+}
+function renderTRRelease(){
+  const el=document.getElementById('trRelease'); if(!el) return; el.innerHTML='';
+  TR.release.forEach(it=>{
+    const row=document.createElement('div'); row.className='inv-row';
+    const nm=document.createElement('input'); nm.className='i-name'; nm.type='text'; nm.placeholder='항목명'; nm.value=it.name;
+    nm.oninput=()=>updTR('release',it.id,'name',nm.value);
+    const qy=document.createElement('input'); qy.className='i-qty'; qy.type='text'; qy.inputMode='numeric'; qy.placeholder='수량'; qy.value=it.qty; qy.style.width='72px';
+    qy.oninput=()=>updTR('release',it.id,'qty',qy.value);
+    const del=document.createElement('button'); del.className='inv-del'; del.textContent='×'; del.onclick=()=>delTRRelease(it.id);
+    row.append(nm,qy,del); el.appendChild(row);
+  });
+}
+function trText(){
+  const d=new Date(); const date=`${d.getMonth()+1}/${d.getDate()}`;
+  const lines=[];
+  if(TR.name && TR.name.trim()) lines.push(TR.name.trim());
+  lines.push(`${date} 세일즈 마감보고`);
+  lines.push('');
+  // 세일즈 건수 (총합 자동)
+  const salesRows=TR.sales.filter(s=>s.team && s.team.trim());
+  const total=TR.sales.reduce((sum,s)=>sum+(parseInt(s.cnt)||0),0);
+  lines.push(`세일즈 ${total}건`);
+  salesRows.forEach(s=>lines.push(`${s.team.trim()} : ${parseInt(s.cnt)||0}건`));
+  // 마감재고
+  const stockRows=TR.stock.filter(s=>s.name && s.name.trim() && s.qty!=='');
+  if(stockRows.length){
+    lines.push(''); lines.push('마감재고');
+    stockRows.forEach(s=>lines.push(`${s.name.trim()} ${s.qty}`));
+  }
+  // 불출 (있을 때만)
+  const relRows=TR.release.filter(s=>s.name && s.name.trim() && s.qty!=='');
+  if(relRows.length){
+    lines.push(''); lines.push('* 불출 있을 시');
+    if(TR.releaseHead && TR.releaseHead.trim()) lines.push(TR.releaseHead.trim());
+    relRows.forEach(s=>lines.push(`${s.name.trim()} ${s.qty}`));
+  }
+  return lines.join('\n').replace(/\s+$/,'');
+}
 function moveText(){
   const lines=[];
   if(MOVE.title && MOVE.title.trim()){ lines.push(MOVE.title.trim()); lines.push(''); }
@@ -1912,6 +2040,7 @@ function invText(){
     return team ? `${team} 오후 세일즈 시작했습니다.` : '오후 세일즈 시작했습니다.';
   }
   if(invMode==='move'){ return moveText(); }
+  if(invMode==='total_report'){ return trText(); }
   const d=new Date(); const date=`${d.getMonth()+1}/${d.getDate()}`;
   const itemLines=[];
   const [fa,fb]=invFields();
