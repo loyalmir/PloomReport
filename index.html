@@ -242,6 +242,11 @@
   .mb-pin{background:none; border:1px solid var(--line); border-radius:7px; padding:5px 11px; font-size:11.5px; font-weight:800; color:var(--txt-faint); cursor:pointer; font-family:inherit;}
   .move-block.active .mb-pin{border-color:var(--coral); color:var(--coral);}
   .mb-del{background:var(--surface-2); border:1px solid var(--line); border-radius:50%; width:26px; height:26px; color:var(--txt-faint); font-size:14px; cursor:pointer; line-height:1;}
+  .cond-row{display:flex; gap:6px; align-items:center; margin-bottom:8px;}
+  .cond-row input{background:var(--surface); border:1px solid var(--line); border-radius:var(--r-sm); color:var(--txt); font-family:inherit; font-size:14px; padding:9px 10px;}
+  .cond-row .cond-label{flex:1; min-width:0; font-weight:600;}
+  .cond-row .cond-val{flex:1.4; min-width:0;}
+  .cond-row input:focus{outline:none; border-color:var(--blue);}
   .toast{
     position:fixed; bottom:96px; left:50%; transform:translateX(-50%) translateY(20px);
     background:var(--txt); color:var(--ink); padding:11px 20px; border-radius:24px; font-weight:800; font-size:14px;
@@ -287,6 +292,7 @@
         <button id="invSegNoon" onclick="setInvMode('noon')">오후</button>
         <button id="invSegMove" onclick="setInvMode('move')">점포이동</button>
         <button id="invSegTotal" onclick="setInvMode('total_report')">총보고</button>
+        <button id="invSegCond" onclick="setInvMode('cond')">컨디션</button>
       </div>
       <div style="display:flex; gap:9px; margin-bottom:12px;" id="invTeamRow">
         <div style="flex:1;">
@@ -326,6 +332,17 @@
       <div id="trRelease"></div>
       <button class="btn btn-ghost btn-block" onclick="addTRRelease()" style="margin-bottom:9px;">+ 불출 항목 추가</button>
       <button class="btn btn-ghost btn-block" onclick="clearTR()">전체 비우기</button>
+    </div>
+    <div class="panel" id="invCondPanel" style="display:none;">
+      <h3>컨디션 보고</h3>
+      <div class="field">
+        <label>제목 <span style="color:var(--txt-faint); font-weight:500;">(대괄호 자동 · 비우면 안 나감)</span></label>
+        <input type="text" id="condTitle" placeholder="예) 보고 양식" oninput="saveCond()">
+      </div>
+      <div style="font-size:12px; font-weight:800; color:var(--txt-dim); margin-bottom:8px; letter-spacing:.4px;">항목 <span style="color:var(--txt-faint); font-weight:600;">(라벨·값 모두 수정)</span></div>
+      <div id="condRows"></div>
+      <button class="btn btn-ghost btn-block" onclick="addCondRow()" style="margin-top:6px;">+ 항목 추가</button>
+      <button class="btn btn-ghost btn-block" onclick="clearCond()" style="margin-top:9px;">기본값으로 초기화</button>
     </div>
     <div class="panel" id="invItemsPanel">
       <h3>재고 항목</h3>
@@ -476,7 +493,7 @@
       <p>입력한 일정·보고 내용을 모두 지웁니다. (API 키는 유지)</p>
       <button class="btn btn-ghost btn-block" onclick="wipeData()">전체 일정 삭제</button>
     </div>
-    <div style="text-align:center; color:var(--txt-faint); font-size:11px; padding:6px 0 10px;" class="mono">ploom-report · build 0642</div>
+    <div style="text-align:center; color:var(--txt-faint); font-size:11px; padding:6px 0 10px;" class="mono">ploom-report · build 0643</div>
   </main>
 </section>
 
@@ -1812,21 +1829,23 @@ function setInvMode(m){
   document.getElementById('invSegNoon').classList.toggle('on',m==='noon');
   document.getElementById('invSegMove').classList.toggle('on',m==='move');
   document.getElementById('invSegTotal').classList.toggle('on',m==='total_report');
+  document.getElementById('invSegCond').classList.toggle('on',m==='cond');
   const itemsPanel=document.getElementById('invItemsPanel');
   const repToggle=document.getElementById('invReportToggle');
   const movePanel=document.getElementById('invMovePanel');
   const totalPanel=document.getElementById('invTotalPanel');
+  const condPanel=document.getElementById('invCondPanel');
   const teamRow=document.getElementById('invTeamRow');
-  // 오후·점포이동·총보고: 기본 재고 항목 패널 숨김
-  const hideItems = (m==='noon'||m==='move'||m==='total_report');
+  const hideItems = (m==='noon'||m==='move'||m==='total_report'||m==='cond');
   if(itemsPanel) itemsPanel.style.display = hideItems?'none':'';
   if(repToggle) repToggle.style.display = hideItems?'none':'';
   if(movePanel) movePanel.style.display = (m==='move')?'':'none';
   if(totalPanel) totalPanel.style.display = (m==='total_report')?'':'none';
-  // 점포이동·총보고는 팀·이름 행 숨김 (자체 입력칸 있음)
-  if(teamRow) teamRow.style.display = (m==='move'||m==='total_report')?'none':'';
+  if(condPanel) condPanel.style.display = (m==='cond')?'':'none';
+  if(teamRow) teamRow.style.display = (m==='move'||m==='total_report'||m==='cond')?'none':'';
   if(m==='move') loadMoveFields();
   if(m==='total_report') loadTR_fields();
+  if(m==='cond') loadCondFields();
   renderInv();
 }
 function loadMove(){
@@ -2018,6 +2037,59 @@ function trText(){
   }
   return lines.join('\n').replace(/\s+$/,'');
 }
+/* ═══════════ 컨디션 보고 ═══════════ */
+function condDefaults(){ let i=Date.now(); return [
+  {id:++i,label:'팀명',val:''},
+  {id:++i,label:'팀원 컨디션',val:'전원 이상 없음'},
+  {id:++i,label:'휴게공간',val:''},
+  {id:++i,label:'현장과의 거리',val:'도보 　분'},
+  {id:++i,label:'냉방시설 및 이용 가능 여부',val:'확인 완료'},
+  {id:++i,label:'휴게공간 사진',val:'첨부'}
+]; }
+function loadCond(){
+  try{ const d=JSON.parse(localStorage.getItem('ploomCond')||'null'); if(d&&Array.isArray(d.rows)) return d; }catch(e){}
+  return {title:'보고 양식', rows:condDefaults()};
+}
+let COND=loadCond(), condNextId=Date.now();
+function saveCond(){
+  const t=document.getElementById('condTitle'); if(t) COND.title=t.value||'';
+  localStorage.setItem('ploomCond', JSON.stringify(COND)); renderInv();
+}
+function loadCondFields(){
+  const t=document.getElementById('condTitle'); if(t) t.value=COND.title||'';
+  renderCondRows();
+}
+function addCondRow(){ COND.rows.push({id:++condNextId,label:'',val:''}); persistCond(); renderCondRows(); }
+function delCondRow(id){ COND.rows=COND.rows.filter(x=>x.id!==id); persistCond(); renderCondRows(); }
+function updCond(id,field,val){ const r=COND.rows.find(x=>x.id===id); if(r){ r[field]=val; persistCond(); } }
+function persistCond(){ localStorage.setItem('ploomCond', JSON.stringify(COND)); renderInv(); }
+function clearCond(){
+  if(!confirm('기본 양식으로 초기화할까요?')) return;
+  COND={title:'보고 양식', rows:condDefaults()};
+  localStorage.setItem('ploomCond', JSON.stringify(COND));
+  loadCondFields(); renderInv(); toast('초기화됨');
+}
+function renderCondRows(){
+  const el=document.getElementById('condRows'); if(!el) return; el.innerHTML='';
+  COND.rows.forEach(r=>{
+    const row=document.createElement('div'); row.className='cond-row';
+    const lab=document.createElement('input'); lab.className='cond-label'; lab.type='text'; lab.placeholder='항목'; lab.value=r.label;
+    lab.oninput=()=>updCond(r.id,'label',lab.value);
+    const val=document.createElement('input'); val.className='cond-val'; val.type='text'; val.placeholder='내용'; val.value=r.val;
+    val.oninput=()=>updCond(r.id,'val',val.value);
+    const del=document.createElement('button'); del.className='inv-del'; del.textContent='×'; del.onclick=()=>delCondRow(r.id);
+    row.append(lab,val,del); el.appendChild(row);
+  });
+}
+function condText(){
+  const lines=[];
+  if(COND.title && COND.title.trim()){ lines.push(`[${COND.title.trim()}]`); lines.push(''); }
+  COND.rows.forEach(r=>{
+    if(!r.label || !r.label.trim()) return;
+    lines.push(`${r.label.trim()}: ${(r.val||'').trim()}`);
+  });
+  return lines.join('\n').replace(/\s+$/,'');
+}
 function moveText(){
   const lines=[];
   if(MOVE.title && MOVE.title.trim()){ lines.push(MOVE.title.trim()); lines.push(''); }
@@ -2041,6 +2113,7 @@ function invText(){
   }
   if(invMode==='move'){ return moveText(); }
   if(invMode==='total_report'){ return trText(); }
+  if(invMode==='cond'){ return condText(); }
   const d=new Date(); const date=`${d.getMonth()+1}/${d.getDate()}`;
   const itemLines=[];
   const [fa,fb]=invFields();
