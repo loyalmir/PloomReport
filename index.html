@@ -331,7 +331,10 @@
       <input type="text" id="trReleaseHead" placeholder="예) 후킷 이대창고 불출" oninput="saveTR()" style="margin-bottom:9px;">
       <div id="trRelease"></div>
       <button class="btn btn-ghost btn-block" onclick="addTRRelease()" style="margin-bottom:9px;">+ 불출 항목 추가</button>
-      <button class="btn btn-ghost btn-block" onclick="clearTR()">전체 비우기</button>
+      <div style="display:flex; gap:9px; margin-top:2px;">
+        <button class="btn btn-ghost" style="flex:1;" onclick="clearTR()">전체 비우기</button>
+        <button class="btn btn-primary" style="flex:1;" onclick="saveTRConfirm()">저장</button>
+      </div>
     </div>
     <div class="panel" id="invCondPanel" style="display:none;">
       <h3>컨디션 보고</h3>
@@ -342,7 +345,17 @@
       <div style="font-size:12px; font-weight:800; color:var(--txt-dim); margin-bottom:8px; letter-spacing:.4px;">항목 <span style="color:var(--txt-faint); font-weight:600;">(라벨·값 모두 수정)</span></div>
       <div id="condRows"></div>
       <button class="btn btn-ghost btn-block" onclick="addCondRow()" style="margin-top:6px;">+ 항목 추가</button>
-      <button class="btn btn-ghost btn-block" onclick="clearCond()" style="margin-top:9px;">기본값으로 초기화</button>
+      <div style="font-size:12px; font-weight:800; color:var(--txt-dim); margin:18px 0 8px; letter-spacing:.4px;">휴게공간 사진</div>
+      <div class="photo-row" id="condPhotoRow">
+        <label class="photo-add">
+          +
+          <input type="file" accept="image/*" multiple hidden onchange="addCondPhotos(event)">
+        </label>
+      </div>
+      <div style="display:flex; gap:9px; margin-top:9px;">
+        <button class="btn btn-ghost" style="flex:1;" onclick="clearCond()">기본값으로 초기화</button>
+        <button class="btn btn-primary" style="flex:1;" onclick="saveCondConfirm()">저장</button>
+      </div>
     </div>
     <div class="panel" id="invItemsPanel">
       <h3>재고 항목</h3>
@@ -493,7 +506,7 @@
       <p>입력한 일정·보고 내용을 모두 지웁니다. (API 키는 유지)</p>
       <button class="btn btn-ghost btn-block" onclick="wipeData()">전체 일정 삭제</button>
     </div>
-    <div style="text-align:center; color:var(--txt-faint); font-size:11px; padding:6px 0 10px;" class="mono">ploom-report · build 0643</div>
+    <div style="text-align:center; color:var(--txt-faint); font-size:11px; padding:6px 0 10px;" class="mono">ploom-report · build 0645</div>
   </main>
 </section>
 
@@ -1845,7 +1858,7 @@ function setInvMode(m){
   if(teamRow) teamRow.style.display = (m==='move'||m==='total_report'||m==='cond')?'none':'';
   if(m==='move') loadMoveFields();
   if(m==='total_report') loadTR_fields();
-  if(m==='cond') loadCondFields();
+  if(m==='cond'){ loadCondFields(); loadCondPhotos(); }
   renderInv();
 }
 function loadMove(){
@@ -1968,6 +1981,7 @@ function addTRRelease(){ TR.release.push({id:++trNextId,name:'',qty:''}); persis
 function delTRRelease(id){ TR.release=TR.release.filter(x=>x.id!==id); persistTR(); renderTRRelease(); }
 function updTR(arr,id,field,val){ const it=TR[arr].find(x=>x.id===id); if(it){ it[field]=val; persistTR(); } }
 function persistTR(){ localStorage.setItem('ploomTR', JSON.stringify(TR)); renderInv(); }
+function saveTRConfirm(){ saveTR(); toast('저장됨 ✓'); }
 function clearTR(){
   if(!confirm('총 보고 내용을 모두 지울까요?')) return;
   localStorage.removeItem('ploomTR'); TR=loadTR(); loadTR_fields(); renderInv(); toast('비웠습니다');
@@ -2063,6 +2077,7 @@ function addCondRow(){ COND.rows.push({id:++condNextId,label:'',val:''}); persis
 function delCondRow(id){ COND.rows=COND.rows.filter(x=>x.id!==id); persistCond(); renderCondRows(); }
 function updCond(id,field,val){ const r=COND.rows.find(x=>x.id===id); if(r){ r[field]=val; persistCond(); } }
 function persistCond(){ localStorage.setItem('ploomCond', JSON.stringify(COND)); renderInv(); }
+function saveCondConfirm(){ saveCond(); toast('저장됨 ✓'); }
 function clearCond(){
   if(!confirm('기본 양식으로 초기화할까요?')) return;
   COND={title:'보고 양식', rows:condDefaults()};
@@ -2089,6 +2104,36 @@ function condText(){
     lines.push(`${r.label.trim()}: ${(r.val||'').trim()}`);
   });
   return lines.join('\n').replace(/\s+$/,'');
+}
+/* 컨디션 휴게공간 사진 (Photos 저장소 재사용, key: cond::photo) */
+let condPhotos=[];
+function loadCondPhotos(){
+  revokeObjUrls2(); condPhotos=[];
+  Photos.get('cond::photo').then(items=>{ condPhotos=items; renderCondPhotos(); });
+}
+const _condUrls=[];
+function mkCondUrl(blob){ const u=URL.createObjectURL(blob); _condUrls.push(u); return u; }
+function revokeObjUrls2(){ while(_condUrls.length) URL.revokeObjectURL(_condUrls.pop()); }
+async function addCondPhotos(ev){
+  const files=[...ev.target.files]; ev.target.value='';
+  for(const f of files){
+    try{ const buf=await f.arrayBuffer(); const blob=new Blob([buf],{type:f.type||'image/jpeg'}); condPhotos.push({objectUrl:mkCondUrl(blob), blob}); }
+    catch(e){ toast('사진을 읽지 못했어요'); }
+  }
+  renderCondPhotos();
+  Photos.set('cond::photo', condPhotos.map(p=>p.blob));
+}
+function rmCondPhoto(i){ condPhotos.splice(i,1); renderCondPhotos(); Photos.set('cond::photo', condPhotos.map(p=>p.blob)); }
+function renderCondPhotos(){
+  const row=document.getElementById('condPhotoRow'); if(!row) return;
+  const add=row.querySelector('.photo-add');
+  row.querySelectorAll('.thumb-wrap').forEach(n=>n.remove());
+  condPhotos.forEach((p,i)=>{
+    const w=document.createElement('div'); w.className='thumb-wrap';
+    const img=document.createElement('img'); img.className='photo-thumb'; img.src=p.objectUrl;
+    const x=document.createElement('button'); x.className='thumb-x'; x.textContent='×'; x.onclick=()=>rmCondPhoto(i);
+    w.append(img,x); row.insertBefore(w, add);
+  });
 }
 function moveText(){
   const lines=[];
@@ -2165,6 +2210,15 @@ async function copyInv(){
 }
 async function shareInv(){
   const t=invText();
+  // 컨디션 모드: 사진 있으면 원본 함께 공유
+  if(invMode==='cond' && condPhotos.length){
+    const files=condPhotos.map((p,i)=> p.blob instanceof File ? p.blob : new File([p.blob], `휴게공간_${i+1}.jpg`, {type:'image/jpeg'}));
+    try{
+      if(navigator.canShare && navigator.canShare({files})){ await navigator.share({text:t, files}); return; }
+      if(navigator.share){ await navigator.share({text:t}); return; }
+    }catch(e){ if(e&&e.name==='AbortError') return; }
+    await navigator.clipboard.writeText(t); toast('사진 공유 미지원 · 텍스트 복사됨'); return;
+  }
   try{
     if(navigator.share) await navigator.share({text:t});
     else{ await navigator.clipboard.writeText(t); toast('공유 미지원 · 복사됨'); return; }
