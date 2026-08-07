@@ -515,7 +515,7 @@
       <p>입력한 일정·보고 내용을 모두 지웁니다. (API 키는 유지)</p>
       <button class="btn btn-ghost btn-block" onclick="wipeData()">전체 일정 삭제</button>
     </div>
-    <div style="text-align:center; color:var(--txt-faint); font-size:11px; padding:6px 0 10px;" class="mono">ploom-report · build 0648</div>
+    <div style="text-align:center; color:var(--txt-faint); font-size:11px; padding:6px 0 10px;" class="mono">ploom-report · build 0649</div>
   </main>
 </section>
 
@@ -1410,7 +1410,7 @@ function reportText(){
   lines.push(`_ 디바이스 재고 : ${stockLine}`);
   lines.push(`_ 리필스틱 재고 : ${refillVal}`);
   lines.push(`_ 진열장 설치여부 : ${standVal}`);
-  lines.push(`_ 미스틱 카카오 추가 : ${mysticVal}`);
+  if(mysticVal) lines.push(`_ 미스틱 카카오 추가 : ${mysticVal}`);
   return lines.join('\n').replace(/\s+$/,'');
 }
 let autoSaveT;
