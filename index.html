@@ -515,7 +515,7 @@
       <p>입력한 일정·보고 내용을 모두 지웁니다. (API 키는 유지)</p>
       <button class="btn btn-ghost btn-block" onclick="wipeData()">전체 일정 삭제</button>
     </div>
-    <div style="text-align:center; color:var(--txt-faint); font-size:11px; padding:6px 0 10px;" class="mono">ploom-report · build 0647</div>
+    <div style="text-align:center; color:var(--txt-faint); font-size:11px; padding:6px 0 10px;" class="mono">ploom-report · build 0648</div>
   </main>
 </section>
 
@@ -577,6 +577,13 @@
         <div class="opts">
           <span class="opt yes" id="standYes" onclick="setStand(true)">설치</span>
           <span class="opt no" id="standNo" onclick="setStand(false)">미설치</span>
+        </div>
+      </div>
+      <div class="field" id="mysticField">
+        <label>미스틱 카카오 추가 <span style="color:var(--txt-faint); font-weight:500;">(다시 누르면 해제)</span></label>
+        <div class="opts">
+          <span class="opt yes" id="mysticYes" onclick="setMystic(true)">O</span>
+          <span class="opt no" id="mysticNo" onclick="setMystic(false)">X</span>
         </div>
       </div>
     </div>
@@ -1198,6 +1205,7 @@ function openSheet(id, defMode){
   if(r.respiTarget===undefined) r.respiTarget='점주';
   if(r.refill===undefined) r.refill=null;
   if(r.stand===undefined) r.stand=null;
+  if(r.mystic===undefined) r.mystic=null;
   if(r.purchase===undefined) r.purchase=null;
   if(r.purchaseNote===undefined) r.purchaseNote='';
   if(r.consent===undefined) r.consent=false;
@@ -1217,7 +1225,7 @@ function openSheet(id, defMode){
   document.getElementById('dayMemo').value=r.dayMemo||'';
   document.getElementById('purchaseNote').value=r.purchaseNote||'';
   document.getElementById('eventMemo').value=r.eventMemo||'';
-  setRefillUI(r.refill); setStandUI(r.stand); setPurchaseUI(r.purchase); setConsentUI(r.consent||false);
+  setRefillUI(r.refill); setStandUI(r.stand); setMysticUI(r.mystic); setPurchaseUI(r.purchase); setConsentUI(r.consent||false);
   showHistHint(v,r);
   const autoMode = (dayReportOn && defMode==='day')?'day': defMode==='event'?'event':'pre';
   setMode(autoMode);
@@ -1301,6 +1309,11 @@ function setStand(v){ const r=DATA[curId].report; r.stand = (r.stand===v)?null:v
 function setStandUI(v){
   document.getElementById('standYes').classList.toggle('on', v===true);
   document.getElementById('standNo').classList.toggle('on', v===false);
+}
+function setMystic(v){ const r=DATA[curId].report; r.mystic = (r.mystic===v)?null:v; setMysticUI(r.mystic); render(); }
+function setMysticUI(v){
+  document.getElementById('mysticYes').classList.toggle('on', v===true);
+  document.getElementById('mysticNo').classList.toggle('on', v===false);
 }
 function setPurchase(v){ const r=DATA[curId].report; r.purchase=(r.purchase===v)?null:v; setPurchaseUI(r.purchase); render(); }
 function setPurchaseUI(v){
@@ -1386,6 +1399,7 @@ function reportText(){
   const respiVal = (r.respiTarget==='점주'||r.respiTarget==='직원') ? r.respiTarget : '';
   const refillVal = r.refill===true?'보유':(r.refill===false?'미보유':'');
   const standVal = r.stand===true?'설치':(r.stand===false?'미설치':'');
+  const mysticVal = r.mystic===true?'O':(r.mystic===false?'X':'');
   const lines=[];
   lines.push(`■ ${dateLabelKR(prevDateKey(v.dateKey, v.team))}${v.round?` / ${v.round}일차`:''}`);
   lines.push(`${v.team} 사전방문보고`);
@@ -1396,6 +1410,7 @@ function reportText(){
   lines.push(`_ 디바이스 재고 : ${stockLine}`);
   lines.push(`_ 리필스틱 재고 : ${refillVal}`);
   lines.push(`_ 진열장 설치여부 : ${standVal}`);
+  lines.push(`_ 미스틱 카카오 추가 : ${mysticVal}`);
   return lines.join('\n').replace(/\s+$/,'');
 }
 let autoSaveT;
