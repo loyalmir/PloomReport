@@ -248,6 +248,10 @@
   .cond-row .cond-label{flex:1; min-width:0; font-weight:600;}
   .cond-row .cond-val{flex:1.4; min-width:0;}
   .cond-row input:focus{outline:none; border-color:var(--blue);}
+  .region-tag{display:inline-flex; align-items:center; gap:6px; background:var(--surface-2); border:1px solid var(--line); border-radius:8px; padding:7px 10px; font-size:13px; font-weight:700; color:var(--txt);}
+  .region-tag button{background:none; border:none; color:var(--txt-faint); font-size:15px; cursor:pointer; padding:0; line-height:1;}
+  .region-chip{background:var(--surface-2); border:1px solid var(--line); border-radius:8px; padding:8px 13px; font-size:14px; font-weight:700; color:var(--txt-dim); cursor:pointer;}
+  .region-chip.on{background:var(--blue); border-color:var(--blue); color:#fff;}
   .toast{
     position:fixed; bottom:96px; left:50%; transform:translateX(-50%) translateY(20px);
     background:var(--txt); color:var(--ink); padding:11px 20px; border-radius:24px; font-weight:800; font-size:14px;
@@ -371,8 +375,9 @@
     <div class="panel" id="invTempPanel" style="display:none;">
       <h3>기온 보고</h3>
       <div class="field">
-        <label>지역 <span style="color:var(--txt-faint); font-weight:500;">(저장됨)</span></label>
-        <input type="text" id="tempRegion" placeholder="예) 마포구" oninput="saveTemp()">
+        <label>지역 <span style="color:var(--txt-faint); font-weight:500;">(설정에서 등록 · 탭 선택)</span></label>
+        <div id="tempRegionChips" style="display:flex; flex-wrap:wrap; gap:7px; margin-bottom:9px;"></div>
+        <input type="text" id="tempRegion" placeholder="직접 입력도 가능" oninput="saveTemp()">
       </div>
       <div class="field">
         <label>시간대</label>
@@ -485,6 +490,15 @@
       <div class="hint">한 팀만 운영하면 <b>창고 + 운영</b>, 여러 팀을 관리하면 <b>총재고 − 판매</b>가 편해요.</div>
     </div>
     <div class="panel">
+      <h3>기온 보고 — 지역 목록</h3>
+      <p>자주 쓰는 지역을 등록해두면 기온 보고에서 탭 한 번으로 골라요.</p>
+      <div style="display:flex; gap:9px; margin-bottom:10px;">
+        <input type="text" id="newRegionInput" placeholder="예) 가산동" style="flex:1;" onkeydown="if(event.key==='Enter')addRegion()">
+        <button class="btn btn-primary" onclick="addRegion()">추가</button>
+      </div>
+      <div id="regionList" style="display:flex; flex-wrap:wrap; gap:7px;"></div>
+    </div>
+    <div class="panel">
       <h3>보고 모드 표시</h3>
       <p>안 쓰는 보고는 꺼두세요. 편집창 상단 탭에서 숨겨집니다. (사전방문은 항상 표시)</p>
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
@@ -544,7 +558,7 @@
       <p>입력한 일정·보고 내용을 모두 지웁니다. (API 키는 유지)</p>
       <button class="btn btn-ghost btn-block" onclick="wipeData()">전체 일정 삭제</button>
     </div>
-    <div style="text-align:center; color:var(--txt-faint); font-size:11px; padding:6px 0 10px;" class="mono">ploom-report · build 0651</div>
+    <div style="text-align:center; color:var(--txt-faint); font-size:11px; padding:6px 0 10px;" class="mono">ploom-report · build 0652</div>
   </main>
 </section>
 
@@ -2169,19 +2183,47 @@ function renderCondRows(){
 }
 /* ═══════════ 기온 보고 ═══════════ */
 let tempTime='';
+function getRegions(){ try{ return JSON.parse(localStorage.getItem('ploomRegions')||'[]'); }catch(e){ return []; } }
+function saveRegions(arr){ localStorage.setItem('ploomRegions', JSON.stringify(arr)); }
+function addRegion(){
+  const inp=document.getElementById('newRegionInput'); if(!inp) return;
+  const v=(inp.value||'').trim(); if(!v) return;
+  const arr=getRegions();
+  if(!arr.includes(v)){ arr.push(v); saveRegions(arr); }
+  inp.value=''; renderRegionList(); renderTempRegionChips();
+}
+function delRegion(name){
+  saveRegions(getRegions().filter(r=>r!==name)); renderRegionList(); renderTempRegionChips();
+}
+function renderRegionList(){
+  const el=document.getElementById('regionList'); if(!el) return;
+  const arr=getRegions();
+  el.innerHTML = arr.length ? arr.map(r=>`<span class="region-tag">${esc(r)}<button onclick="delRegion('${esc(r).replace(/'/g,"\\'")}')">×</button></span>`).join('') : '<span style="color:var(--txt-faint); font-size:13px;">등록된 지역이 없어요</span>';
+}
+function renderTempRegionChips(){
+  const el=document.getElementById('tempRegionChips'); if(!el) return;
+  const arr=getRegions();
+  const cur=(document.getElementById('tempRegion')||{}).value||'';
+  el.innerHTML = arr.map(r=>`<span class="region-chip${r===cur?' on':''}" onclick="pickRegion('${esc(r).replace(/'/g,"\\'")}')">${esc(r)}</span>`).join('');
+}
+function pickRegion(name){
+  const inp=document.getElementById('tempRegion'); if(inp){ inp.value=name; localStorage.setItem('ploomTempRegion',name); }
+  renderTempRegionChips(); renderInv();
+}
 function loadTempFields(){
   const region=localStorage.getItem('ploomTempRegion')||'';
   const rEl=document.getElementById('tempRegion'); if(rEl) rEl.value=region;
-  // 시간·기온은 매번 새로 (지역만 유지)
   const real=document.getElementById('tempReal'), feel=document.getElementById('tempFeel');
   if(real) real.value=''; if(feel) feel.value='';
   tempTime='';
   document.querySelectorAll('#tempTimeSeg button').forEach(b=>b.classList.remove('on'));
+  renderTempRegionChips();
   renderInv();
 }
 function saveTemp(){
   const rEl=document.getElementById('tempRegion');
   if(rEl) localStorage.setItem('ploomTempRegion', rEl.value||'');
+  renderTempRegionChips();
   renderInv();
 }
 function setTempTime(t){
@@ -2196,7 +2238,6 @@ function tempText(){
   const head = [tempTime, region.trim()].filter(Boolean).join(' / ');
   const lines=[];
   if(head) lines.push(head);
-  lines.push('');
   lines.push(` 실 기온 : ${real.trim()?real.trim():'00'}℃`);
   lines.push(` 체감온도 : ${feel.trim()?feel.trim():'00'}℃`);
   return lines.join('\n');
@@ -2369,6 +2410,7 @@ window.addEventListener('DOMContentLoaded',()=>{
   document.getElementById('invModeSub').classList.toggle('on', invInputMode==='sub');
   applyInvHeader(); applyInvReportLabels();
   loadMoveFields();
+  renderRegionList();
   renderInvItems(); renderInv();
   document.getElementById('dayRepOff').classList.toggle('on', !dayReportOn);
   document.getElementById('dayRepOn').classList.toggle('on', dayReportOn);
