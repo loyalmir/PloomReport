@@ -293,6 +293,7 @@
         <button id="invSegMove" onclick="setInvMode('move')">점포이동</button>
         <button id="invSegTotal" onclick="setInvMode('total_report')">총보고</button>
         <button id="invSegCond" onclick="setInvMode('cond')">컨디션</button>
+        <button id="invSegTemp" onclick="setInvMode('temp')">기온</button>
       </div>
       <div class="seg" id="noonAmPmRow" style="display:none; margin-bottom:12px;">
         <button id="noonAm" onclick="setNoonAmPm('오전')">오전</button>
@@ -364,6 +365,33 @@
       <div style="display:flex; gap:9px; margin-top:9px;">
         <button class="btn btn-ghost" style="flex:1;" onclick="clearCond()">기본값으로 초기화</button>
         <button class="btn btn-primary" style="flex:1;" onclick="saveCondConfirm()">저장</button>
+      </div>
+    </div>
+    <div class="panel" id="invTempPanel" style="display:none;">
+      <h3>기온 보고</h3>
+      <div class="field">
+        <label>지역 <span style="color:var(--txt-faint); font-weight:500;">(저장됨)</span></label>
+        <input type="text" id="tempRegion" placeholder="예) 마포구" oninput="saveTemp()">
+      </div>
+      <div class="field">
+        <label>시간대</label>
+        <div class="seg" id="tempTimeSeg" style="flex-wrap:wrap;">
+          <button onclick="setTempTime('10:00')">10:00</button>
+          <button onclick="setTempTime('12:00')">12:00</button>
+          <button onclick="setTempTime('14:00')">14:00</button>
+          <button onclick="setTempTime('16:00')">16:00</button>
+          <button onclick="setTempTime('18:00')">18:00</button>
+        </div>
+      </div>
+      <div style="display:flex; gap:9px;">
+        <div class="field" style="flex:1; margin-bottom:0;">
+          <label>실 기온 (℃)</label>
+          <input type="text" id="tempReal" inputmode="decimal" placeholder="00" oninput="saveTemp()">
+        </div>
+        <div class="field" style="flex:1; margin-bottom:0;">
+          <label>체감온도 (℃)</label>
+          <input type="text" id="tempFeel" inputmode="decimal" placeholder="00" oninput="saveTemp()">
+        </div>
       </div>
     </div>
     <div class="panel" id="invItemsPanel">
@@ -515,7 +543,7 @@
       <p>입력한 일정·보고 내용을 모두 지웁니다. (API 키는 유지)</p>
       <button class="btn btn-ghost btn-block" onclick="wipeData()">전체 일정 삭제</button>
     </div>
-    <div style="text-align:center; color:var(--txt-faint); font-size:11px; padding:6px 0 10px;" class="mono">ploom-report · build 0649</div>
+    <div style="text-align:center; color:var(--txt-faint); font-size:11px; padding:6px 0 10px;" class="mono">ploom-report · build 0650</div>
   </main>
 </section>
 
@@ -1875,24 +1903,28 @@ function setInvMode(m){
   document.getElementById('invSegMove').classList.toggle('on',m==='move');
   document.getElementById('invSegTotal').classList.toggle('on',m==='total_report');
   document.getElementById('invSegCond').classList.toggle('on',m==='cond');
+  document.getElementById('invSegTemp').classList.toggle('on',m==='temp');
   const itemsPanel=document.getElementById('invItemsPanel');
   const repToggle=document.getElementById('invReportToggle');
   const movePanel=document.getElementById('invMovePanel');
   const totalPanel=document.getElementById('invTotalPanel');
   const condPanel=document.getElementById('invCondPanel');
+  const tempPanel=document.getElementById('invTempPanel');
   const teamRow=document.getElementById('invTeamRow');
-  const hideItems = (m==='noon'||m==='move'||m==='total_report'||m==='cond');
+  const hideItems = (m==='noon'||m==='move'||m==='total_report'||m==='cond'||m==='temp');
   if(itemsPanel) itemsPanel.style.display = hideItems?'none':'';
   if(repToggle) repToggle.style.display = hideItems?'none':'';
   if(movePanel) movePanel.style.display = (m==='move')?'':'none';
   if(totalPanel) totalPanel.style.display = (m==='total_report')?'':'none';
   if(condPanel) condPanel.style.display = (m==='cond')?'':'none';
-  if(teamRow) teamRow.style.display = (m==='move'||m==='total_report'||m==='cond')?'none':'';
+  if(tempPanel) tempPanel.style.display = (m==='temp')?'':'none';
+  if(teamRow) teamRow.style.display = (m==='move'||m==='total_report'||m==='cond'||m==='temp')?'none':'';
   const amPmRow=document.getElementById('noonAmPmRow');
   if(amPmRow) amPmRow.style.display = (m==='noon')?'flex':'none';
   if(m==='move') loadMoveFields();
   if(m==='total_report') loadTR_fields();
   if(m==='cond'){ loadCondFields(); loadCondPhotos(); }
+  if(m==='temp') loadTempFields();
   renderInv();
 }
 function loadMove(){
@@ -2134,6 +2166,40 @@ function renderCondRows(){
     row.append(lab,val,del); el.appendChild(row);
   });
 }
+/* ═══════════ 기온 보고 ═══════════ */
+let tempTime='';
+function loadTempFields(){
+  const region=localStorage.getItem('ploomTempRegion')||'';
+  const rEl=document.getElementById('tempRegion'); if(rEl) rEl.value=region;
+  // 시간·기온은 매번 새로 (지역만 유지)
+  const real=document.getElementById('tempReal'), feel=document.getElementById('tempFeel');
+  if(real) real.value=''; if(feel) feel.value='';
+  tempTime='';
+  document.querySelectorAll('#tempTimeSeg button').forEach(b=>b.classList.remove('on'));
+  renderInv();
+}
+function saveTemp(){
+  const rEl=document.getElementById('tempRegion');
+  if(rEl) localStorage.setItem('ploomTempRegion', rEl.value||'');
+  renderInv();
+}
+function setTempTime(t){
+  tempTime=t;
+  document.querySelectorAll('#tempTimeSeg button').forEach(b=>b.classList.toggle('on', b.textContent===t));
+  renderInv();
+}
+function tempText(){
+  const region=(document.getElementById('tempRegion')||{}).value||'';
+  const real=(document.getElementById('tempReal')||{}).value||'';
+  const feel=(document.getElementById('tempFeel')||{}).value||'';
+  const head = [tempTime, region.trim()].filter(Boolean).join(' / ');
+  const lines=[];
+  if(head) lines.push(head);
+  lines.push('');
+  lines.push(` 실 기온 : ${real.trim()?real.trim():'00'}℃`);
+  lines.push(` 체감온도 : ${feel.trim()?feel.trim():'00'}℃`);
+  return lines.join('\n');
+}
 function condText(){
   const lines=[];
   if(COND.title && COND.title.trim()){ lines.push(`[${COND.title.trim()}]`); lines.push(''); }
@@ -2198,6 +2264,7 @@ function invText(){
   if(invMode==='move'){ return moveText(); }
   if(invMode==='total_report'){ return trText(); }
   if(invMode==='cond'){ return condText(); }
+  if(invMode==='temp'){ return tempText(); }
   const d=new Date(); const date=`${d.getMonth()+1}/${d.getDate()}`;
   const itemLines=[];
   const [fa,fb]=invFields();
