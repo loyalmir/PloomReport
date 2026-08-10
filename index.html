@@ -149,8 +149,9 @@
   .sheet-body{overflow-y:auto; padding:16px 18px 28px; -webkit-overflow-scrolling:touch;}
 
   .seg{display:flex; background:var(--surface); border-radius:var(--r-sm); padding:4px; gap:4px; margin-bottom:18px;}
-  .seg button{flex:1; padding:10px; border:none; background:none; color:var(--txt-dim); font-weight:800; font-size:14px; border-radius:7px; cursor:pointer; transition:.12s;}
+  .seg button{flex:1; padding:10px; border:none; background:none; color:var(--txt-dim); font-weight:800; font-size:14px; border-radius:7px; cursor:pointer; transition:.12s; white-space:nowrap;}
   .seg button.on{background:var(--blue); color:#fff;}
+  .seg-modes button{flex:0 1 auto; padding:9px 13px; font-size:13px; min-width:0;}
 
   .field{margin-bottom:17px;}
   .field > label{display:block; font-size:12px; font-weight:700; color:var(--txt-dim); margin-bottom:8px; letter-spacing:.3px;}
@@ -286,11 +287,11 @@
   <main>
     <div class="panel">
       <h3>재고 보고</h3>
-      <div class="seg" style="margin-bottom:14px; flex-wrap:wrap;">
-        <button id="invSegStart" onclick="setInvMode('start')">시작보고</button>
-        <button id="invSegEnd" class="on" onclick="setInvMode('end')">마감보고</button>
+      <div class="seg seg-modes" style="margin-bottom:14px; flex-wrap:wrap;">
+        <button id="invSegStart" onclick="setInvMode('start')">시작</button>
+        <button id="invSegEnd" class="on" onclick="setInvMode('end')">마감</button>
         <button id="invSegNoon" onclick="setInvMode('noon')">오후</button>
-        <button id="invSegMove" onclick="setInvMode('move')">점포이동</button>
+        <button id="invSegMove" onclick="setInvMode('move')">이동</button>
         <button id="invSegTotal" onclick="setInvMode('total_report')">총보고</button>
         <button id="invSegCond" onclick="setInvMode('cond')">컨디션</button>
         <button id="invSegTemp" onclick="setInvMode('temp')">기온</button>
@@ -543,7 +544,7 @@
       <p>입력한 일정·보고 내용을 모두 지웁니다. (API 키는 유지)</p>
       <button class="btn btn-ghost btn-block" onclick="wipeData()">전체 일정 삭제</button>
     </div>
-    <div style="text-align:center; color:var(--txt-faint); font-size:11px; padding:6px 0 10px;" class="mono">ploom-report · build 0650</div>
+    <div style="text-align:center; color:var(--txt-faint); font-size:11px; padding:6px 0 10px;" class="mono">ploom-report · build 0651</div>
   </main>
 </section>
 
