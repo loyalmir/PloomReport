@@ -248,6 +248,10 @@
   .cond-row .cond-label{flex:1; min-width:0; font-weight:600;}
   .cond-row .cond-val{flex:1.4; min-width:0;}
   .cond-row input:focus{outline:none; border-color:var(--blue);}
+  .temp-block{border:1px solid var(--line); border-radius:var(--r-sm); padding:13px; margin-bottom:12px; background:var(--surface);}
+  .temp-block input{width:100%; background:var(--surface-2); border:1px solid var(--line); border-radius:var(--r-sm); color:var(--txt); font-family:inherit; font-size:15px; padding:9px 11px;}
+  .temp-block input:focus{outline:none; border-color:var(--blue);}
+  .tb-head{display:flex; justify-content:space-between; align-items:center; margin-bottom:9px;}
   .region-tag{display:inline-flex; align-items:center; gap:6px; background:var(--surface-2); border:1px solid var(--line); border-radius:8px; padding:7px 10px; font-size:13px; font-weight:700; color:var(--txt);}
   .region-tag button{background:none; border:none; color:var(--txt-faint); font-size:15px; cursor:pointer; padding:0; line-height:1;}
   .region-chip{background:var(--surface-2); border:1px solid var(--line); border-radius:8px; padding:8px 13px; font-size:14px; font-weight:700; color:var(--txt-dim); cursor:pointer;}
@@ -375,30 +379,16 @@
     <div class="panel" id="invTempPanel" style="display:none;">
       <h3>기온 보고</h3>
       <div class="field">
-        <label>지역 <span style="color:var(--txt-faint); font-weight:500;">(설정에서 등록 · 탭 선택)</span></label>
-        <div id="tempRegionChips" style="display:flex; flex-wrap:wrap; gap:7px; margin-bottom:9px;"></div>
-        <input type="text" id="tempRegion" placeholder="직접 입력도 가능" oninput="saveTemp()">
-      </div>
-      <div class="field">
-        <label>시간대</label>
+        <label>시간대 <span style="color:var(--txt-faint); font-weight:500;">(전체 공통)</span></label>
         <div class="seg" id="tempTimeSeg" style="flex-wrap:wrap;">
           <button onclick="setTempTime('10:00')">10:00</button>
           <button onclick="setTempTime('12:00')">12:00</button>
           <button onclick="setTempTime('14:00')">14:00</button>
           <button onclick="setTempTime('16:00')">16:00</button>
-          <button onclick="setTempTime('18:00')">18:00</button>
         </div>
       </div>
-      <div style="display:flex; gap:9px;">
-        <div class="field" style="flex:1; margin-bottom:0;">
-          <label>실 기온 (℃)</label>
-          <input type="text" id="tempReal" inputmode="decimal" placeholder="00" oninput="saveTemp()">
-        </div>
-        <div class="field" style="flex:1; margin-bottom:0;">
-          <label>체감온도 (℃)</label>
-          <input type="text" id="tempFeel" inputmode="decimal" placeholder="00" oninput="saveTemp()">
-        </div>
-      </div>
+      <div id="tempBlocks"></div>
+      <button class="btn btn-ghost btn-block" onclick="addTempBlock()" style="margin-top:6px;">+ 지역 추가</button>
     </div>
     <div class="panel" id="invItemsPanel">
       <h3>재고 항목</h3>
@@ -558,7 +548,7 @@
       <p>입력한 일정·보고 내용을 모두 지웁니다. (API 키는 유지)</p>
       <button class="btn btn-ghost btn-block" onclick="wipeData()">전체 일정 삭제</button>
     </div>
-    <div style="text-align:center; color:var(--txt-faint); font-size:11px; padding:6px 0 10px;" class="mono">ploom-report · build 0652</div>
+    <div style="text-align:center; color:var(--txt-faint); font-size:11px; padding:6px 0 10px;" class="mono">ploom-report · build 0653</div>
   </main>
 </section>
 
@@ -2190,57 +2180,75 @@ function addRegion(){
   const v=(inp.value||'').trim(); if(!v) return;
   const arr=getRegions();
   if(!arr.includes(v)){ arr.push(v); saveRegions(arr); }
-  inp.value=''; renderRegionList(); renderTempRegionChips();
+  inp.value=''; renderRegionList(); renderTempBlocks();
 }
 function delRegion(name){
-  saveRegions(getRegions().filter(r=>r!==name)); renderRegionList(); renderTempRegionChips();
+  saveRegions(getRegions().filter(r=>r!==name)); renderRegionList(); renderTempBlocks();
 }
 function renderRegionList(){
   const el=document.getElementById('regionList'); if(!el) return;
   const arr=getRegions();
   el.innerHTML = arr.length ? arr.map(r=>`<span class="region-tag">${esc(r)}<button onclick="delRegion('${esc(r).replace(/'/g,"\\'")}')">×</button></span>`).join('') : '<span style="color:var(--txt-faint); font-size:13px;">등록된 지역이 없어요</span>';
 }
-function renderTempRegionChips(){
-  const el=document.getElementById('tempRegionChips'); if(!el) return;
-  const arr=getRegions();
-  const cur=(document.getElementById('tempRegion')||{}).value||'';
-  el.innerHTML = arr.map(r=>`<span class="region-chip${r===cur?' on':''}" onclick="pickRegion('${esc(r).replace(/'/g,"\\'")}')">${esc(r)}</span>`).join('');
+
+// 기온 지역 블록 (여러 지역 한 번에)
+function loadTempState(){
+  try{ const d=JSON.parse(localStorage.getItem('ploomTempBlocks')||'null'); if(d&&Array.isArray(d)&&d.length) return d; }catch(e){}
+  return [{id:Date.now(), region:'', real:'', feel:''}];
 }
-function pickRegion(name){
-  const inp=document.getElementById('tempRegion'); if(inp){ inp.value=name; localStorage.setItem('ploomTempRegion',name); }
-  renderTempRegionChips(); renderInv();
+let TEMPB=loadTempState(), tempNextId=Date.now();
+function persistTempB(){ localStorage.setItem('ploomTempBlocks', JSON.stringify(TEMPB)); renderInv(); }
+function addTempBlock(){ TEMPB.push({id:++tempNextId, region:'', real:'', feel:''}); persistTempB(); renderTempBlocks(); }
+function delTempBlock(id){
+  TEMPB=TEMPB.filter(x=>x.id!==id);
+  if(!TEMPB.length) TEMPB=[{id:++tempNextId,region:'',real:'',feel:''}];
+  persistTempB(); renderTempBlocks();
 }
-function loadTempFields(){
-  const region=localStorage.getItem('ploomTempRegion')||'';
-  const rEl=document.getElementById('tempRegion'); if(rEl) rEl.value=region;
-  const real=document.getElementById('tempReal'), feel=document.getElementById('tempFeel');
-  if(real) real.value=''; if(feel) feel.value='';
-  tempTime='';
-  document.querySelectorAll('#tempTimeSeg button').forEach(b=>b.classList.remove('on'));
-  renderTempRegionChips();
-  renderInv();
-}
-function saveTemp(){
-  const rEl=document.getElementById('tempRegion');
-  if(rEl) localStorage.setItem('ploomTempRegion', rEl.value||'');
-  renderTempRegionChips();
-  renderInv();
-}
+function updTempB(id,field,val){ const b=TEMPB.find(x=>x.id===id); if(b){ b[field]=val; persistTempB(); } }
+function loadTempFields(){ renderTempBlocks(); }
 function setTempTime(t){
   tempTime=t;
   document.querySelectorAll('#tempTimeSeg button').forEach(b=>b.classList.toggle('on', b.textContent===t));
   renderInv();
 }
+function renderTempBlocks(){
+  const el=document.getElementById('tempBlocks'); if(!el) return; el.innerHTML='';
+  const regions=getRegions();
+  TEMPB.forEach((b,idx)=>{
+    const wrap=document.createElement('div'); wrap.className='temp-block';
+    // 지역 칩 + 직접입력
+    const chips = regions.map(r=>`<span class="region-chip${r===b.region?' on':''}" onclick="pickTempRegion(${b.id},'${esc(r).replace(/'/g,"\\'")}')">${esc(r)}</span>`).join('');
+    wrap.innerHTML=`
+      <div class="tb-head">
+        <span style="font-size:12px; font-weight:800; color:var(--txt-dim);">지역 ${idx+1}</span>
+        ${TEMPB.length>1?`<button class="mb-del" onclick="delTempBlock(${b.id})">×</button>`:''}
+      </div>
+      <div style="display:flex; flex-wrap:wrap; gap:7px; margin-bottom:9px;">${chips}</div>
+      <input type="text" class="tb-region" placeholder="직접 입력도 가능" value="${esc(b.region)}" oninput="updTempB(${b.id},'region',this.value)" style="margin-bottom:9px;">
+      <div style="display:flex; gap:9px;">
+        <div style="flex:1;"><label style="font-size:11px; color:var(--txt-faint); display:block; margin-bottom:5px;">실 기온 (℃)</label>
+          <input type="text" inputmode="decimal" placeholder="00" value="${esc(b.real)}" oninput="updTempB(${b.id},'real',this.value)"></div>
+        <div style="flex:1;"><label style="font-size:11px; color:var(--txt-faint); display:block; margin-bottom:5px;">체감온도 (℃)</label>
+          <input type="text" inputmode="decimal" placeholder="00" value="${esc(b.feel)}" oninput="updTempB(${b.id},'feel',this.value)"></div>
+      </div>`;
+    el.appendChild(wrap);
+  });
+}
+function pickTempRegion(id, name){
+  const b=TEMPB.find(x=>x.id===id); if(b){ b.region=name; persistTempB(); renderTempBlocks(); }
+}
 function tempText(){
-  const region=(document.getElementById('tempRegion')||{}).value||'';
-  const real=(document.getElementById('tempReal')||{}).value||'';
-  const feel=(document.getElementById('tempFeel')||{}).value||'';
-  const head = [tempTime, region.trim()].filter(Boolean).join(' / ');
-  const lines=[];
-  if(head) lines.push(head);
-  lines.push(` 실 기온 : ${real.trim()?real.trim():'00'}℃`);
-  lines.push(` 체감온도 : ${feel.trim()?feel.trim():'00'}℃`);
-  return lines.join('\n');
+  const segs=[];
+  TEMPB.forEach(b=>{
+    const region=(b.region||'').trim();
+    const head=[tempTime, region].filter(Boolean).join(' / ');
+    const lines=[];
+    if(head) lines.push(head);
+    lines.push(` 실 기온 : ${(b.real||'').trim()?b.real.trim():'00'}℃`);
+    lines.push(` 체감온도 : ${(b.feel||'').trim()?b.feel.trim():'00'}℃`);
+    segs.push(lines.join('\n'));
+  });
+  return segs.join('\n\n');
 }
 function condText(){
   const lines=[];
@@ -2335,7 +2343,7 @@ function invText(){
     return lines.join('\n').replace(/\n{3,}/g,'\n\n').replace(/\s+$/,'');
   } else {
     const lines=[];
-    if(team) lines.push(`${team} 세일즈 종료했습니다`);
+    lines.push('세일즈 종료했습니다');
     lines.push('');
     if(name) lines.push(name);
     lines.push(`${date} 마감재고`);
