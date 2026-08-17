@@ -146,7 +146,7 @@
   .sheet-head .meta{font-size:12.5px; color:var(--txt-dim); margin-top:3px;}
   .code-btn{display:inline-flex; align-items:center; gap:5px; margin-top:6px; background:var(--surface-2); border:1px solid var(--line); border-radius:8px; padding:5px 10px; font-size:12px; font-weight:700; color:var(--txt-dim); cursor:pointer; font-family:'JetBrains Mono',monospace; letter-spacing:.3px;}
   .code-btn:active{background:var(--blue); color:#fff; border-color:var(--blue);}
-  .sheet-body{overflow-y:auto; padding:16px 18px 28px; -webkit-overflow-scrolling:touch;}
+  .sheet-body{flex:1; min-height:0; overflow-y:auto; overscroll-behavior:contain; padding:16px 18px 28px; -webkit-overflow-scrolling:touch;}
 
   .seg{display:flex; background:var(--surface); border-radius:var(--r-sm); padding:4px; gap:4px; margin-bottom:18px;}
   .seg button{flex:1; padding:10px; border:none; background:none; color:var(--txt-dim); font-weight:800; font-size:14px; border-radius:7px; cursor:pointer; transition:.12s; white-space:nowrap;}
@@ -548,7 +548,7 @@
       <p>입력한 일정·보고 내용을 모두 지웁니다. (API 키는 유지)</p>
       <button class="btn btn-ghost btn-block" onclick="wipeData()">전체 일정 삭제</button>
     </div>
-    <div style="text-align:center; color:var(--txt-faint); font-size:11px; padding:6px 0 10px;" class="mono">ploom-report · build 0653</div>
+    <div style="text-align:center; color:var(--txt-faint); font-size:11px; padding:6px 0 10px;" class="mono">ploom-report · build 0654</div>
   </main>
 </section>
 
@@ -908,10 +908,10 @@ const Photos = {
     });
   },
   async set(key, blobs){   // blobs: [File|Blob]
-    try{ await this.open(); }catch(e){ return; }
-    return new Promise(res=>{ const os=this._os('readwrite');
+    await this.open();
+    return new Promise((res,rej)=>{ const os=this._os('readwrite');
       if(blobs&&blobs.length) os.put({key, ev:eventTsOf(key), blobs}); else os.delete(key);
-      os.transaction.oncomplete=res; os.transaction.onerror=res;
+      os.transaction.oncomplete=res; os.transaction.onerror=()=>rej(os.transaction.error);
     });
   }
 };
@@ -1518,16 +1518,21 @@ async function addPhotos(ev){
   const files=[...ev.target.files];
   ev.target.value='';
   if(!files.length) return;
+  let ok=0;
   for(const f of files){
     try{
       // iOS는 File이 원본 파일 '참조'라 나중에 만료될 수 있음 → 실제 데이터를 복사해 Blob으로 보관
       const buf=await f.arrayBuffer();
       const blob=new Blob([buf], {type:f.type||'image/jpeg'});
       photos.push({objectUrl:mkObjUrl(blob), blob});
+      ok++;
     }catch(e){ console.warn('사진 읽기 실패',e); toast('사진 하나를 읽지 못했어요'); }
   }
   renderPhotos();
-  await savePhotos();
+  try{
+    await savePhotos();
+    if(ok) toast(ok+'장 저장됨');
+  }catch(e){ toast('사진 저장 실패 · 저장공간을 확인하세요'); }
 }
 function savePhotos(){ if(curId) return Photos.set(photoKey(curId,curMode), photos.map(p=>p.blob)); }
 function resizeImg(src, cb){
