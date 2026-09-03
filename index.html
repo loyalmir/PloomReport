@@ -344,7 +344,10 @@
         <label>편의점 판매 <span style="color:var(--txt-faint); font-weight:500;">(선택 · 건수 아래 한 줄)</span></label>
         <input type="text" id="trCvs" placeholder="예) 편의점 판매 2건 포함/ cvs 2건 포함" oninput="saveTR()">
       </div>
-      <div style="font-size:12px; font-weight:800; color:var(--txt-dim); margin-bottom:8px; letter-spacing:.4px;">마감재고</div>
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+        <span style="font-size:12px; font-weight:800; color:var(--txt-dim); letter-spacing:.4px;">마감재고</span>
+        <button class="code-btn" onclick="pullInvIntoTR(true)" style="border-color:var(--blue); color:var(--blue);">시작/마감 합계 불러오기</button>
+      </div>
       <div id="trStock"></div>
       <button class="btn btn-ghost btn-block" onclick="addTRStock()" style="margin-bottom:16px;">+ 재고 항목 추가</button>
       <div style="font-size:12px; font-weight:800; color:var(--txt-dim); margin-bottom:8px; letter-spacing:.4px;">불출 <span style="color:var(--txt-faint); font-weight:600;">(있을 때만)</span></div>
@@ -549,7 +552,7 @@
       <p>입력한 일정·보고 내용을 모두 지웁니다. (API 키는 유지)</p>
       <button class="btn btn-ghost btn-block" onclick="wipeData()">전체 일정 삭제</button>
     </div>
-    <div style="text-align:center; color:var(--txt-faint); font-size:11px; padding:6px 0 10px;" class="mono">ploom-report · build 0656</div>
+    <div style="text-align:center; color:var(--txt-faint); font-size:11px; padding:6px 0 10px;" class="mono">ploom-report · build 0657</div>
   </main>
 </section>
 
@@ -1948,7 +1951,7 @@ function setInvMode(m){
   const amPmRow=document.getElementById('noonAmPmRow');
   if(amPmRow) amPmRow.style.display = (m==='noon')?'flex':'none';
   if(m==='move') loadMoveFields();
-  if(m==='total_report') loadTR_fields();
+  if(m==='total_report'){ pullInvIntoTR(false); loadTR_fields(); }
   if(m==='cond'){ loadCondFields(); loadCondPhotos(); }
   if(m==='temp') loadTempFields();
   renderInv();
@@ -2075,6 +2078,33 @@ function delTRRelease(id){ TR.release=TR.release.filter(x=>x.id!==id); persistTR
 function updTR(arr,id,field,val){ const it=TR[arr].find(x=>x.id===id); if(it){ it[field]=val; persistTR(); } }
 function persistTR(){ localStorage.setItem('ploomTR', JSON.stringify(TR)); renderInv(); }
 function saveTRConfirm(){ saveTR(); toast('저장됨 ✓'); }
+// 시작/마감 재고 항목의 합계를 총보고 마감재고로 가져오기
+function invStockTotals(){
+  // INV.items의 각 항목 이름+합계 (합계 있는 것만)
+  return INV.items
+    .filter(it=>it.name && it.name.trim())
+    .map(it=>({name:it.name.trim(), total:calcTotal(it)}))
+    .filter(x=>x.total!==null);
+}
+function pullInvIntoTR(force){
+  const totals=invStockTotals();
+  if(!totals.length){ if(force) toast('시작/마감에 입력된 재고가 없어요'); return; }
+  if(force){
+    // 버튼 클릭: 이름 기준으로 덮어쓰되, 없는 항목은 추가
+    totals.forEach(t=>{
+      const ex=TR.stock.find(s=>s.name.trim()===t.name);
+      if(ex) ex.qty=String(t.total);
+      else TR.stock.push({id:++trNextId, name:t.name, qty:String(t.total)});
+    });
+    persistTR(); renderTRStock(); toast('합계를 가져왔어요 ✓');
+  } else {
+    // 자동(총보고 열 때): 마감재고가 비어있을 때만 채움
+    const hasData=TR.stock.some(s=>s.name.trim() && s.qty!=='');
+    if(hasData) return;
+    TR.stock = totals.map(t=>({id:++trNextId, name:t.name, qty:String(t.total)}));
+    persistTR(); renderTRStock();
+  }
+}
 function clearTR(){
   if(!confirm('총 보고 내용을 모두 지울까요?')) return;
   localStorage.removeItem('ploomTR'); TR=loadTR(); loadTR_fields(); renderInv(); toast('비웠습니다');
