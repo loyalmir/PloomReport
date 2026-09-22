@@ -552,7 +552,7 @@
       <p>입력한 일정·보고 내용을 모두 지웁니다. (API 키는 유지)</p>
       <button class="btn btn-ghost btn-block" onclick="wipeData()">전체 일정 삭제</button>
     </div>
-    <div style="text-align:center; color:var(--txt-faint); font-size:11px; padding:6px 0 10px;" class="mono">ploom-report · build 0658</div>
+    <div style="text-align:center; color:var(--txt-faint); font-size:11px; padding:6px 0 10px;" class="mono">ploom-report · build 0659</div>
   </main>
 </section>
 
@@ -623,6 +623,14 @@
           <span class="opt yes" id="mysticYes" onclick="setMystic(true)">O</span>
           <span class="opt no" id="mysticNo" onclick="setMystic(false)">X</span>
         </div>
+      </div>
+      <div class="field" id="rivalField">
+        <label>타사 전자담배 프로모션 <span style="color:var(--txt-faint); font-weight:500;">(다시 누르면 해제)</span></label>
+        <div class="opts">
+          <span class="opt yes" id="rivalYes" onclick="setRival(true)">있음</span>
+          <span class="opt no" id="rivalNo" onclick="setRival(false)">없음</span>
+        </div>
+        <textarea id="rivalNote" placeholder="있으면 내용 입력… (예: 특정 제품 할인 행사 진행 중)" style="margin-top:8px; display:none;" oninput="render()"></textarea>
       </div>
     </div>
 
@@ -1268,6 +1276,7 @@ function openSheet(id, defMode){
   if(r.refill===undefined) r.refill=null;
   if(r.stand===undefined) r.stand=null;
   if(r.mystic===undefined) r.mystic=null;
+  if(r.rival===undefined) r.rival=null;
   if(r.purchase===undefined) r.purchase=null;
   if(r.purchaseNote===undefined) r.purchaseNote='';
   if(r.consent===undefined) r.consent=false;
@@ -1287,7 +1296,8 @@ function openSheet(id, defMode){
   document.getElementById('dayMemo').value=r.dayMemo||'';
   document.getElementById('purchaseNote').value=r.purchaseNote||'';
   document.getElementById('eventMemo').value=r.eventMemo||'';
-  setRefillUI(r.refill); setStandUI(r.stand); setMysticUI(r.mystic); setPurchaseUI(r.purchase); setConsentUI(r.consent||false);
+  setRefillUI(r.refill); setStandUI(r.stand); setMysticUI(r.mystic); setRivalUI(r.rival); setPurchaseUI(r.purchase); setConsentUI(r.consent||false);
+  document.getElementById('rivalNote').value=r.rivalNote||'';
   showHistHint(v,r);
   const autoMode = (dayReportOn && defMode==='day')?'day': defMode==='event'?'event':'pre';
   setMode(autoMode);
@@ -1373,6 +1383,15 @@ function setStandUI(v){
   document.getElementById('standNo').classList.toggle('on', v===false);
 }
 function setMystic(v){ const r=DATA[curId].report; r.mystic = (r.mystic===v)?null:v; setMysticUI(r.mystic); render(); }
+function setRival(v){
+  const r=DATA[curId].report; r.rival = (r.rival===v)?null:v; setRivalUI(r.rival); render();
+}
+function setRivalUI(v){
+  document.getElementById('rivalYes').classList.toggle('on', v===true);
+  document.getElementById('rivalNo').classList.toggle('on', v===false);
+  // '있음'일 때만 내용 메모 보임
+  document.getElementById('rivalNote').style.display = (v===true)?'block':'none';
+}
 function setMysticUI(v){
   document.getElementById('mysticYes').classList.toggle('on', v===true);
   document.getElementById('mysticNo').classList.toggle('on', v===false);
@@ -1473,6 +1492,12 @@ function reportText(){
   lines.push(`_ 리필스틱 재고 : ${refillVal}`);
   lines.push(`_ 진열장 설치여부 : ${standVal}`);
   if(mysticVal) lines.push(`_ 미스틱 카카오 추가 : ${mysticVal}`);
+  if(r.rival===true||r.rival===false){
+    const rivalVal = r.rival===true?'있음':'없음';
+    let line=`_ 타사 전자담배 프로모션 : ${rivalVal}`;
+    if(r.rival===true && r.rivalNote && r.rivalNote.trim()) line+=` (${r.rivalNote.trim()})`;
+    lines.push(line);
+  }
   return lines.join('\n').replace(/\s+$/,'');
 }
 let autoSaveT;
@@ -1490,6 +1515,7 @@ function render(){
   r.dayMemo=val('dayMemo');
   r.purchaseNote=val('purchaseNote');
   r.eventMemo=val('eventMemo');
+  r.rivalNote=val('rivalNote');
   const t=reportText();
   const pv=document.getElementById('preview');
   if(pv) pv.textContent= t || '—';
