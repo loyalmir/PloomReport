@@ -552,7 +552,7 @@
       <p>입력한 일정·보고 내용을 모두 지웁니다. (API 키는 유지)</p>
       <button class="btn btn-ghost btn-block" onclick="wipeData()">전체 일정 삭제</button>
     </div>
-    <div style="text-align:center; color:var(--txt-faint); font-size:11px; padding:6px 0 10px;" class="mono">ploom-report · build 0659</div>
+    <div style="text-align:center; color:var(--txt-faint); font-size:11px; padding:6px 0 10px;" class="mono">ploom-report · build 0660</div>
   </main>
 </section>
 
@@ -568,6 +568,7 @@
       <button class="code-btn" id="ownerMsgBtn" onclick="openOwnerMsg()" style="border-color:var(--kakao); color:var(--kakao);">✉️ 문자</button>
       <button class="code-btn" onclick="openMovePick()" style="border-color:var(--coral); color:var(--coral);">📍 이동</button>
       <button class="code-btn" onclick="openStoreEdit()" style="border-color:var(--green); color:var(--green);">✏️ 수정</button>
+      <button class="code-btn" onclick="delCurrentVisit()" style="border-color:var(--coral); color:var(--coral);">🗑 삭제</button>
     </div>
   </div>
   <div class="sheet-body">
@@ -1264,6 +1265,13 @@ function renderSchedule(){
   </div>`).join('');
 }
 function delVisit(e,id){ e.preventDefault(); if(confirm('이 매장을 일정에서 지울까요?')){ delete DATA[id]; Store.save(); } }
+function delCurrentVisit(){
+  const v=DATA[curId]; if(!v) return;
+  if(!confirm(`"${v.brand} ${v.store}" 매장을 일정에서 삭제할까요?\n(작성한 보고·사진도 함께 지워집니다)`)) return;
+  delete DATA[curId]; Store.save();
+  closeSheet(); renderAll();
+  toast('매장 삭제됨');
+}
 
 function esc(s){ return (s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
 
