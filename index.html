@@ -310,6 +310,10 @@
         <button id="noonPm" class="on" onclick="setNoonAmPm('오후')">오후</button>
         <button id="noonEnd" onclick="setNoonAmPm('마감')">마감</button>
       </div>
+      <div id="joinTeamRow" style="display:none; margin-bottom:12px;">
+        <label style="font-size:12px; font-weight:700; color:var(--txt-dim); display:block; margin-bottom:6px;">합류팀 <span style="color:var(--txt-faint); font-weight:500;">(오전 · 비우면 합류 줄 안 나감)</span></label>
+        <input type="text" id="joinTeam" placeholder="예) 2팀" oninput="saveJoinTeam()">
+      </div>
       <div style="display:flex; gap:9px; margin-bottom:12px;" id="invTeamRow">
         <div style="flex:1;">
           <label style="font-size:12px; font-weight:700; color:var(--txt-dim); display:block; margin-bottom:6px;">팀명</label>
@@ -552,7 +556,7 @@
       <p>입력한 일정·보고 내용을 모두 지웁니다. (API 키는 유지)</p>
       <button class="btn btn-ghost btn-block" onclick="wipeData()">전체 일정 삭제</button>
     </div>
-    <div style="text-align:center; color:var(--txt-faint); font-size:11px; padding:6px 0 10px;" class="mono">ploom-report · build 0660</div>
+    <div style="text-align:center; color:var(--txt-faint); font-size:11px; padding:6px 0 10px;" class="mono">ploom-report · build 0662</div>
   </main>
 </section>
 
@@ -644,25 +648,49 @@
 
     <div id="eventFields" style="display:none;">
       <div class="field">
-        <label>구매 <span style="color:var(--txt-faint); font-weight:500;">(다시 누르면 해제)</span></label>
-        <div class="opts">
-          <span class="opt yes" id="purchaseO" onclick="setPurchase(true)">O</span>
-          <span class="opt no" id="purchaseX" onclick="setPurchase(false)">X</span>
-        </div>
-      </div>
-      <div class="field" id="purchaseNoteField" style="display:none;">
-        <label>구매 내용</label>
-        <textarea id="purchaseNote" placeholder="구매 내용 적어주세요." oninput="render()"></textarea>
+        <label>진행 안내</label>
+        <input type="text" id="evProgress" placeholder="예) 안내 완료 및 진행 동의" oninput="render()">
       </div>
       <div class="field">
-        <label>동의서</label>
+        <label>안내 대상 <span style="color:var(--txt-faint); font-weight:500;">(다시 누르면 해제)</span></label>
         <div class="opts">
-          <span class="opt yes" id="consentYes" onclick="setConsent(true)">작성 완료</span>
+          <span class="opt yes" id="evRespiOwner" onclick="setEvRespi('점주')">점주</span>
+          <span class="opt no" id="evRespiStaff" onclick="setEvRespi('직원')">직원</span>
         </div>
       </div>
       <div class="field">
-        <label>특이사항 <span style="color:var(--txt-faint); font-weight:500;">(선택)</span></label>
-        <textarea id="eventMemo" placeholder="직접 입력해주세요." oninput="render()"></textarea>
+        <label>점포 재고</label>
+        <div class="opts" id="evStockOpts">
+          <span class="opt" data-stock="블랙" onclick="toggleEvStock('블랙')">블랙</span>
+          <span class="opt" data-stock="실버" onclick="toggleEvStock('실버')">실버</span>
+          <span class="opt no" data-stock="재고없음" onclick="toggleEvStock('재고없음')">재고없음</span>
+        </div>
+        <div class="hint">블랙·실버는 누를 때마다 1 → 2 → 0 으로 바뀝니다.</div>
+      </div>
+      <div class="field">
+        <label>스틱 발주여부 <span style="color:var(--txt-faint); font-weight:500;">(다시 누르면 해제)</span></label>
+        <div class="opts">
+          <span class="opt yes" id="evStickO" onclick="setEvStick(true)">O</span>
+          <span class="opt no" id="evStickX" onclick="setEvStick(false)">X</span>
+        </div>
+      </div>
+      <div class="field">
+        <label>부스 위치</label>
+        <input type="text" id="evBooth" placeholder="예) 점포 인근 흡연장" oninput="render()">
+      </div>
+      <div class="field">
+        <label>점포 피드백</label>
+        <input type="text" id="evFeedback" placeholder="예) 없음" oninput="render()">
+      </div>
+      <div class="field">
+        <label>인근 점포 <span style="color:var(--txt-faint); font-weight:500;">(선택)</span></label>
+        <input type="text" id="evNearby" placeholder="예) 세븐일레븐 구로대륭점" oninput="render()">
+      </div>
+      <div class="field">
+        <label>활동 동의서 작성 <span style="color:var(--txt-faint); font-weight:500;">(다시 누르면 해제)</span></label>
+        <div class="opts">
+          <span class="opt yes" id="consentYes" onclick="setConsent(true)">작성완료</span>
+        </div>
       </div>
     </div>
 
@@ -1289,6 +1317,15 @@ function openSheet(id, defMode){
   if(r.purchaseNote===undefined) r.purchaseNote='';
   if(r.consent===undefined) r.consent=false;
   if(r.eventMemo===undefined) r.eventMemo='';
+  // 행사당일 체크리스트 기본값
+  if(r.evProgress===undefined) r.evProgress='안내 완료 및 진행 동의';
+  if(r.evRespi===undefined) r.evRespi=null;
+  if(r.evStock===undefined) r.evStock={};
+  if(r.evStick===undefined) r.evStick=null;
+  if(r.evBooth===undefined) r.evBooth='점포 인근 흡연장';
+  if(r.evFeedback===undefined) r.evFeedback='없음';
+  if(r.evNearby===undefined) r.evNearby='';
+  r.evStock=normStock(r.evStock);
   r.stock=normStock(r.stock);
   document.getElementById('edName').textContent=v.store;
   document.getElementById('edMeta').textContent=`${v.team} · ${v.brand} · ${v.type} · ${v.dateKey} ${v.dow}`;
@@ -1300,12 +1337,13 @@ function openSheet(id, defMode){
   document.getElementById('respiField').style.display = 'block';
   document.getElementById('standField').style.display = 'block';
   updateRespiUI(r.respiTarget);
-  document.getElementById('envText').value=r.env||'';
-  document.getElementById('dayMemo').value=r.dayMemo||'';
-  document.getElementById('purchaseNote').value=r.purchaseNote||'';
-  document.getElementById('eventMemo').value=r.eventMemo||'';
-  setRefillUI(r.refill); setStandUI(r.stand); setMysticUI(r.mystic); setRivalUI(r.rival); setPurchaseUI(r.purchase); setConsentUI(r.consent||false);
-  document.getElementById('rivalNote').value=r.rivalNote||'';
+  const setVal=(id,v)=>{ const el=document.getElementById(id); if(el) el.value=v||''; };
+  setVal('envText',r.env); setVal('dayMemo',r.dayMemo);
+  setVal('rivalNote',r.rivalNote);
+  // 행사당일 체크리스트 값 채우기
+  setVal('evProgress',r.evProgress); setVal('evBooth',r.evBooth); setVal('evFeedback',r.evFeedback); setVal('evNearby',r.evNearby);
+  setRefillUI(r.refill); setStandUI(r.stand); setMysticUI(r.mystic); setRivalUI(r.rival); setConsentUI(r.consent||false);
+  setEvRespiUI(r.evRespi); setEvStickUI(r.evStick); renderEvStockOpts();
   showHistHint(v,r);
   const autoMode = (dayReportOn && defMode==='day')?'day': defMode==='event'?'event':'pre';
   setMode(autoMode);
@@ -1414,6 +1452,38 @@ function setConsent(v){ const r=DATA[curId].report; r.consent=(r.consent===v)?fa
 function setConsentUI(v){
   document.getElementById('consentYes').classList.toggle('on', !!v);
 }
+/* ── 행사당일 체크리스트 버튼 ── */
+function setEvRespi(who){ const r=DATA[curId].report; r.evRespi=(r.evRespi===who)?null:who; setEvRespiUI(r.evRespi); render(); }
+function setEvRespiUI(who){
+  document.getElementById('evRespiOwner').classList.toggle('on', who==='점주');
+  document.getElementById('evRespiStaff').classList.toggle('on', who==='직원');
+}
+function setEvStick(v){ const r=DATA[curId].report; r.evStick=(r.evStick===v)?null:v; setEvStickUI(r.evStick); render(); }
+function setEvStickUI(v){
+  document.getElementById('evStickO').classList.toggle('on', v===true);
+  document.getElementById('evStickX').classList.toggle('on', v===false);
+}
+function toggleEvStock(s){
+  const r=DATA[curId].report;
+  if(typeof r.evStock!=='object' || Array.isArray(r.evStock)) r.evStock=migrateStock(r.evStock);
+  if(s==='재고없음'){
+    r.evStock = r.evStock.none ? {} : {none:true};
+  } else {
+    delete r.evStock.none;
+    const cur=r.evStock[s]||0;
+    r.evStock[s] = cur===0?1 : cur===1?2 : 0;
+    if(r.evStock[s]===0) delete r.evStock[s];
+  }
+  renderEvStockOpts(); render();
+}
+function renderEvStockOpts(){
+  const r=DATA[curId].report;
+  document.querySelectorAll('#evStockOpts .opt').forEach(o=>{
+    const k=o.dataset.stock;
+    if(k==='재고없음'){ o.classList.toggle('on', !!r.evStock.none); o.textContent='재고없음'; }
+    else { const c=r.evStock[k]||0; o.classList.toggle('on', c>0); o.textContent = c>0 ? (k+' '+c) : k; }
+  });
+}
 function setRespi(who){ const r=DATA[curId].report; r.respiTarget = (r.respiTarget===who)?null:who; updateRespiUI(r.respiTarget); render(); }
 function updateRespiUI(who){
   document.getElementById('respiOwner').classList.toggle('on', who==='점주');
@@ -1471,16 +1541,21 @@ function reportText(){
     return t.replace(/\s+$/,'');
   }
   if(curMode==='event'){
-    const roundLabel = v.round ? `${v.round}일차 ` : '';
-    const purchaseVal = r.purchase===true?'O':(r.purchase===false?'X':'');
+    const g=id=>{ const el=document.getElementById(id); return el?(el.value||'').trim():''; };
+    const stockLine = buildStockLine(r.evStock) || '';
+    const respiVal = (r.evRespi==='점주'||r.evRespi==='직원') ? r.evRespi : '';
+    const stickVal = r.evStick===true?'o':(r.evStick===false?'x':'');
     const lines=[];
-    lines.push(`📌 ${dateLabelKR(v.dateKey)} ${roundLabel}행사당일 보고`);
-    lines.push(`점포명 : ${v.brand} ${v.store}`);
-    lines.push(`구매 : ${purchaseVal}`);
-    if(r.purchase===true && r.purchaseNote && r.purchaseNote.trim())
-      lines.push(`_ 구매 내용 : ${r.purchaseNote.trim()}`);
-    if(r.consent) lines.push(`동의서 작성 완료`);
-    if(r.eventMemo && r.eventMemo.trim()) lines.push(`특이사항 : ${r.eventMemo.trim()}`);
+    lines.push(`${v.team} 오전 세일즈 시작 보고`);
+    lines.push(`□ 대상 점포 : ${v.brand} ${v.store}`);
+    lines.push(`□ 진행 안내 : ${g('evProgress')}`);
+    lines.push(`□ 안내 대상 : ${respiVal}`);
+    lines.push(`□ 점포 재고 : ${stockLine}`);
+    lines.push(`□ 스틱 발주여부 : ${stickVal}`);
+    lines.push(`□ 부스 위치 : ${g('evBooth')}`);
+    lines.push(`□ 점포 피드백 : ${g('evFeedback')}`);
+    if(g('evNearby')) lines.push(`□ 인근 점포 : ${g('evNearby')}`);
+    if(r.consent) lines.push(`□ 활동 동의서 작성(${v.brand}) : 작성완료`);
     return lines.join('\n').replace(/\s+$/,'');
   }
   // 사전방문 — 체크리스트 양식
@@ -1521,9 +1596,9 @@ function render(){
   const val=id=>{ const el=document.getElementById(id); return el?el.value:''; };
   r.env=val('envText');
   r.dayMemo=val('dayMemo');
-  r.purchaseNote=val('purchaseNote');
-  r.eventMemo=val('eventMemo');
   r.rivalNote=val('rivalNote');
+  // 행사당일 체크리스트 글자칸 저장
+  r.evProgress=val('evProgress'); r.evBooth=val('evBooth'); r.evFeedback=val('evFeedback'); r.evNearby=val('evNearby');
   const t=reportText();
   const pv=document.getElementById('preview');
   if(pv) pv.textContent= t || '—';
@@ -1981,6 +2056,14 @@ function setNoonAmPm(v){
   document.getElementById('noonAm').classList.toggle('on', v==='오전');
   document.getElementById('noonPm').classList.toggle('on', v==='오후');
   document.getElementById('noonEnd').classList.toggle('on', v==='마감');
+  // 합류팀 칸은 오전일 때만
+  const jr=document.getElementById('joinTeamRow');
+  if(jr) jr.style.display = (v==='오전')?'block':'none';
+  renderInv();
+}
+function saveJoinTeam(){
+  const el=document.getElementById('joinTeam');
+  if(el) localStorage.setItem('ploomJoinTeam', el.value||'');
   renderInv();
 }
 function setInvMode(m){
@@ -2009,6 +2092,10 @@ function setInvMode(m){
   if(teamRow) teamRow.style.display = (m==='move'||m==='total_report'||m==='cond'||m==='temp')?'none':'';
   const amPmRow=document.getElementById('noonAmPmRow');
   if(amPmRow) amPmRow.style.display = (m==='noon')?'flex':'none';
+  // 합류팀 칸: 오후 모드 + 오전 선택일 때만
+  const jr=document.getElementById('joinTeamRow');
+  if(jr) jr.style.display = (m==='noon' && noonAmPm==='오전')?'block':'none';
+  if(m==='noon'){ const jt=document.getElementById('joinTeam'); if(jt) jt.value=localStorage.getItem('ploomJoinTeam')||''; }
   if(m==='move') loadMoveFields();
   if(m==='total_report'){ pullInvIntoTR(false); loadTR_fields(); }
   if(m==='cond'){ loadCondFields(); loadCondPhotos(); }
@@ -2462,7 +2549,16 @@ function invText(){
   const name=(document.getElementById('invName')||{}).value||'';
   if(invMode==='noon'){
     if(noonAmPm==='마감') return team ? `${team} 세일즈 종료했습니다.` : '세일즈 종료했습니다.';
-    return team ? `${team} ${noonAmPm} 세일즈 시작했습니다.` : `${noonAmPm} 세일즈 시작했습니다.`;
+    const head = team ? `${team} ${noonAmPm} 세일즈 시작했습니다.` : `${noonAmPm} 세일즈 시작했습니다.`;
+    // 오전: '수퍼바이저 {이름} {합류팀}팀 합류' 줄 추가 (합류팀 있을 때만)
+    if(noonAmPm==='오전'){
+      const join=(document.getElementById('joinTeam')||{}).value||'';
+      if(name && join.trim()){
+        const jt=join.trim().replace(/팀$/,'');   // '2팀' 입력해도 '2'만 남겨 중복 방지
+        return `${head}\n수퍼바이저 ${name} ${jt}팀 합류`;
+      }
+    }
+    return head;
   }
   if(invMode==='move'){ return moveText(); }
   if(invMode==='total_report'){ return trText(); }
