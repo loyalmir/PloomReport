@@ -311,7 +311,7 @@
         <button id="noonEnd" onclick="setNoonAmPm('마감')">마감</button>
       </div>
       <div id="joinTeamRow" style="display:none; margin-bottom:12px;">
-        <label style="font-size:12px; font-weight:700; color:var(--txt-dim); display:block; margin-bottom:6px;">합류팀 <span style="color:var(--txt-faint); font-weight:500;">(오전 · 비우면 합류 줄 안 나감)</span></label>
+        <label style="font-size:12px; font-weight:700; color:var(--txt-dim); display:block; margin-bottom:6px;">합류팀 <span style="color:var(--txt-faint); font-weight:500;">(비우면 합류 줄 안 나감)</span></label>
         <input type="text" id="joinTeam" placeholder="예) 2팀" oninput="saveJoinTeam()">
       </div>
       <div style="display:flex; gap:9px; margin-bottom:12px;" id="invTeamRow">
@@ -556,7 +556,7 @@
       <p>입력한 일정·보고 내용을 모두 지웁니다. (API 키는 유지)</p>
       <button class="btn btn-ghost btn-block" onclick="wipeData()">전체 일정 삭제</button>
     </div>
-    <div style="text-align:center; color:var(--txt-faint); font-size:11px; padding:6px 0 10px;" class="mono">ploom-report · build 0662</div>
+    <div style="text-align:center; color:var(--txt-faint); font-size:11px; padding:6px 0 10px;" class="mono">ploom-report · build 0663</div>
   </main>
 </section>
 
@@ -2056,9 +2056,9 @@ function setNoonAmPm(v){
   document.getElementById('noonAm').classList.toggle('on', v==='오전');
   document.getElementById('noonPm').classList.toggle('on', v==='오후');
   document.getElementById('noonEnd').classList.toggle('on', v==='마감');
-  // 합류팀 칸은 오전일 때만
+  // 합류팀 칸은 오전·오후일 때 (마감 제외)
   const jr=document.getElementById('joinTeamRow');
-  if(jr) jr.style.display = (v==='오전')?'block':'none';
+  if(jr) jr.style.display = (v==='오전'||v==='오후')?'block':'none';
   renderInv();
 }
 function saveJoinTeam(){
@@ -2094,7 +2094,7 @@ function setInvMode(m){
   if(amPmRow) amPmRow.style.display = (m==='noon')?'flex':'none';
   // 합류팀 칸: 오후 모드 + 오전 선택일 때만
   const jr=document.getElementById('joinTeamRow');
-  if(jr) jr.style.display = (m==='noon' && noonAmPm==='오전')?'block':'none';
+  if(jr) jr.style.display = (m==='noon' && (noonAmPm==='오전'||noonAmPm==='오후'))?'block':'none';
   if(m==='noon'){ const jt=document.getElementById('joinTeam'); if(jt) jt.value=localStorage.getItem('ploomJoinTeam')||''; }
   if(m==='move') loadMoveFields();
   if(m==='total_report'){ pullInvIntoTR(false); loadTR_fields(); }
@@ -2550,13 +2550,11 @@ function invText(){
   if(invMode==='noon'){
     if(noonAmPm==='마감') return team ? `${team} 세일즈 종료했습니다.` : '세일즈 종료했습니다.';
     const head = team ? `${team} ${noonAmPm} 세일즈 시작했습니다.` : `${noonAmPm} 세일즈 시작했습니다.`;
-    // 오전: '수퍼바이저 {이름} {합류팀}팀 합류' 줄 추가 (합류팀 있을 때만)
-    if(noonAmPm==='오전'){
-      const join=(document.getElementById('joinTeam')||{}).value||'';
-      if(name && join.trim()){
-        const jt=join.trim().replace(/팀$/,'');   // '2팀' 입력해도 '2'만 남겨 중복 방지
-        return `${head}\n수퍼바이저 ${name} ${jt}팀 합류`;
-      }
+    // 오전·오후: '수퍼바이저 {이름} {합류팀}팀 합류' 줄 추가 (합류팀 있을 때만)
+    const join=(document.getElementById('joinTeam')||{}).value||'';
+    if(name && join.trim()){
+      const jt=join.trim().replace(/팀$/,'');   // '2팀' 입력해도 '2'만 남겨 중복 방지
+      return `${head}\n수퍼바이저 ${name} ${jt}팀 합류`;
     }
     return head;
   }
