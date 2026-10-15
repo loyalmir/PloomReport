@@ -1338,6 +1338,12 @@ function card(v, defMode){
       ${v.group?`<span class="tag" style="background:rgba(255,107,92,.14); color:var(--coral);">${esc(v.group)}</span>`:''}
     </div>
     ${v.addr?`<div class="addr">${esc(v.addr)} ${naver}</div>`:''}
+    <div style="padding:10px 0 2px;">
+  <button class="btn btn-primary btn-block"
+    onclick="event.stopPropagation(); openNoticeFromStore('${v.id}')">
+    팀 공지에 담기 →
+  </button>
+</div>
   </div>`;
 }
 
@@ -2739,26 +2745,40 @@ const TEAM_NOTICES = {
 
 let selectedNoticeTeam = 1;
   function openNoticeFromToday() {
-  // 오늘 화면에서 선택한 팀 확인
-  if (!filterTeam || filterTeam === '전체') {
-    toast('오늘 화면에서 팀을 먼저 선택하세요.');
+function openNoticeFromStore(id) {
+  const v = DATA[id];
+  if (!v) {
+    toast('매장 정보를 찾을 수 없어요.');
     return;
   }
-
-  // 팀 이름에서 숫자 추출 (예: 1팀 → 1)
-  const match = String(filterTeam).match(/\d+/);
+  const match = String(v.team || '').match(/\d+/);
   const team = match ? Number(match[0]) : 0;
-
   if (![1, 2, 3, 4].includes(team)) {
-    toast('현재 1~4팀 공지만 연결되어 있어요.');
+    toast('현재 1~4팀 공지만 지원해요.');
     return;
   }
-
-  // 해당 팀 공지로 이동하고 자동 선택
+  const type =
+    (v.type || '').includes('흡연') || team >= 3
+      ? '흡연구역'
+      : '점포';
+  const time = team >= 3 ? '10:30' : '10:00';
+  const store = v.store || '점포명 미입력';
+  const address = v.addr || '주소 미입력';
+  const notice = `${team}팀
+[${type}]
+${time} 집결 - ${team}팀
+출근장소 : ${address}, ${store}
+세일즈 폼즈 점포 : 현장 출근 후 [${store}] 방문하여 동의 얻고 해당 점포로 보고 및 폼즈 작성 요망.
+(실시간 세일즈폼즈 작성 시 참고)
+(물자 수령 후 10:50까지 셋팅 완료 후 출근보고.)`;
+  selectedNoticeTeam = team;
   switchView('teamnotice');
-  selectNoticeTeam(team);
+  document.getElementById('teamNoticeText').value = notice;
+  document.querySelectorAll('#noticeTeamChips button')
+    .forEach((button, index) => {
+      button.classList.toggle('on', index + 1 === team);
+    });
 }
-
 function selectNoticeTeam(team) {
   selectedNoticeTeam = team;
 
@@ -2789,11 +2809,11 @@ async function copyTextFallback(text) {
 }
 
 function copyTeamNotice() {
-  copyTextFallback(TEAM_NOTICES[selectedNoticeTeam]);
+  const text = document.getElementById('teamNoticeText').value;
+  copyTextFallback(text);
 }
-
 async function shareTeamNotice() {
-  const text = TEAM_NOTICES[selectedNoticeTeam];
+  const text = document.getElementById('teamNoticeText').value;
 
   try {
     if (navigator.share) {
@@ -2807,7 +2827,7 @@ async function shareTeamNotice() {
     }
   }
 }
-
+  
 function copyAllTeamNotices() {
   const text = [1, 2, 3, 4]
     .map(team => TEAM_NOTICES[team])
