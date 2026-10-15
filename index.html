@@ -291,6 +291,51 @@
   <main id="storeList"></main>
 </section>
 
+<!-- ════════ 팀별 카카오톡 공지 ════════ -->
+<section class="view" id="view-teamnotice">
+  <main>
+    <div class="panel">
+      <h3>팀별 출근 안내</h3>
+      <div class="hint" style="margin-bottom:14px;">
+        팀을 선택하고 안내문을 복사해 카카오톡에 붙여넣으세요.
+      </div>
+
+      <div class="seg" id="noticeTeamChips"
+           style="margin-bottom:14px;">
+        <button class="on" onclick="selectNoticeTeam(1)">1팀</button>
+        <button onclick="selectNoticeTeam(2)">2팀</button>
+        <button onclick="selectNoticeTeam(3)">3팀</button>
+        <button onclick="selectNoticeTeam(4)">4팀</button>
+      </div>
+
+      <div class="field">
+        <label>카카오톡 공지 내용</label>
+        <textarea id="teamNoticeText"
+          rows="16"
+          style="min-height:360px; white-space:pre-wrap;"
+          readonly></textarea>
+      </div>
+
+      <button class="btn btn-kakao btn-block"
+        onclick="copyTeamNotice()">
+        선택한 팀 안내문 복사
+      </button>
+
+      <button class="btn btn-ghost btn-block"
+        style="margin-top:9px;"
+        onclick="shareTeamNotice()">
+        선택한 팀 안내문 공유
+      </button>
+
+      <button class="btn btn-ghost btn-block"
+        style="margin-top:9px;"
+        onclick="copyAllTeamNotices()">
+        1~4팀 전체 안내문 복사
+      </button>
+    </div>
+  </main>
+</section>
+  
 <!-- ════════ 마감재고 ════════ -->
 <section class="view" id="view-inventory">
   <main>
@@ -719,6 +764,17 @@
   <button class="on" data-view="today" onclick="switchView('today')">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M12 3v18" opacity="0"/><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/></svg>
     오늘
+    <button data-view="teamnotice"
+  onclick="switchView('teamnotice')">
+  <svg viewBox="0 0 24 24" fill="none"
+    stroke="currentColor" stroke-width="2">
+    <circle cx="9" cy="8" r="3"/>
+    <path d="M3 20v-1a6 6 0 0 1 12 0v1
+      M16 5.5a3 3 0 0 1 0 5.8
+      M18 14a5 5 0 0 1 3 4.6V20"/>
+  </svg>
+  팀 공지
+</button>
   </button>
   <button data-view="inventory" onclick="switchView('inventory')">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="18" rx="2"/><path d="M8 3v18M2 9h20M2 15h20"/></svg>
@@ -2627,6 +2683,112 @@ async function shareInv(){
 }
 
 /* ═══════════ 탭 + 토스트 ═══════════ */
+  /* ═══════════ 팀별 카카오톡 공지 ═══════════ */
+
+const TEAM_NOTICES = {
+  1: `1팀
+[점포]
+10:00 집결- 1팀
+
+출근장소 : 서울 영등포구 문래동 6가 19 (영등포구), 세븐일레븐 문래sk점
+
+세일즈 폼즈 점포 : 현장 출근 후 [세븐일레븐 문래sk점]방문하여 동의얻고 해당 점포로 보고 및 폼즈작성 요망.
+(실시간 세일즈폼즈 작성시 참고)
+
+(물자 수령 후 10:50까지  셋팅 완료 후 출근보고.)`,
+
+  2: `2팀
+[점포]
+10:00 집결 2팀
+
+출근장소 : 서울 영등포구 경인로775 (영등포구), gs25 문래에이스점
+
+세일즈 폼즈 점포 : 현장 출근 후 [gs25 문래에이스점]방문하여 동의얻고 해당 점포로 보고 및 폼즈작성 요망.
+(실시간 세일즈폼즈 작성시 참고)
+
+(물자 수령 후 10:50까지  셋팅 완료 후 출근보고.)`,
+
+  3: `[흡연구역]
+3팀
+[흡연구역]
+10:30집결 - 3팀
+
+출근장소 : 서울 영등포구 선유동2로 64 (영등포구), cu 당산sk점
+
+세일즈 폼즈 점포 : 현장 출근 후 [cu 당산sk점]방문하여 동의얻고 해당 점포로 보고 및 폼즈작성 요망.
+(실시간 세일즈폼즈 작성시 참고)
+
+(물자 수령 후 10:50까지  셋팅 완료 후 출근보고.)`,
+
+  4: `[흡연구역]
+10:30집결 - 4팀
+
+출근장소 : 영등포구문래동3가 83-2 (영등포구), cu문래벤처점
+
+세일즈 폼즈 점포 : 현장 출근 후 [cu문래벤처점]방문하여 동의얻고 해당 점포로 보고 및 폼즈작성 요망.
+(실시간 세일즈폼즈 작성시 참고)
+
+(물자 수령 후 10:50까지  셋팅 완료 후 출근보고.)`
+};
+
+let selectedNoticeTeam = 1;
+
+function selectNoticeTeam(team) {
+  selectedNoticeTeam = team;
+
+  document.querySelectorAll('#noticeTeamChips button')
+    .forEach((button, index) => {
+      button.classList.toggle('on', index + 1 === team);
+    });
+
+  document.getElementById('teamNoticeText').value =
+    TEAM_NOTICES[team];
+}
+
+async function copyTextFallback(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch (e) {
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.style.position = 'fixed';
+    textarea.style.opacity = '0';
+    document.body.appendChild(textarea);
+    textarea.select();
+    document.execCommand('copy');
+    textarea.remove();
+  }
+
+  toast('안내문을 복사했어요. 카카오톡에 붙여넣으세요.');
+}
+
+function copyTeamNotice() {
+  copyTextFallback(TEAM_NOTICES[selectedNoticeTeam]);
+}
+
+async function shareTeamNotice() {
+  const text = TEAM_NOTICES[selectedNoticeTeam];
+
+  try {
+    if (navigator.share) {
+      await navigator.share({ text });
+    } else {
+      await copyTextFallback(text);
+    }
+  } catch (e) {
+    if (e && e.name !== 'AbortError') {
+      await copyTextFallback(text);
+    }
+  }
+}
+
+function copyAllTeamNotices() {
+  const text = [1, 2, 3, 4]
+    .map(team => TEAM_NOTICES[team])
+    .join('\\n\\n--------------------------------------------\\n\\n');
+
+  copyTextFallback(text);
+}
 function switchView(v){
   document.querySelectorAll('.view').forEach(s=>s.classList.remove('on'));
   document.getElementById('view-'+v).classList.add('on');
