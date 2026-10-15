@@ -288,6 +288,12 @@
     </div>
     <div class="filter-row" id="teamChips"><span class="lbl">팀</span></div>
   </div>
+  <div style="padding:0 14px 12px;">
+  <button class="btn btn-primary btn-block"
+    onclick="openNoticeFromToday()">
+    선택한 팀 공지 보기
+  </button>
+</div>
   <main id="storeList"></main>
 </section>
 
@@ -2732,6 +2738,26 @@ const TEAM_NOTICES = {
 };
 
 let selectedNoticeTeam = 1;
+  function openNoticeFromToday() {
+  // 오늘 화면에서 선택한 팀 확인
+  if (!filterTeam || filterTeam === '전체') {
+    toast('오늘 화면에서 팀을 먼저 선택하세요.');
+    return;
+  }
+
+  // 팀 이름에서 숫자 추출 (예: 1팀 → 1)
+  const match = String(filterTeam).match(/\d+/);
+  const team = match ? Number(match[0]) : 0;
+
+  if (![1, 2, 3, 4].includes(team)) {
+    toast('현재 1~4팀 공지만 연결되어 있어요.');
+    return;
+  }
+
+  // 해당 팀 공지로 이동하고 자동 선택
+  switchView('teamnotice');
+  selectNoticeTeam(team);
+}
 
 function selectNoticeTeam(team) {
   selectedNoticeTeam = team;
