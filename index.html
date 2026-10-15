@@ -288,60 +288,9 @@
     </div>
     <div class="filter-row" id="teamChips"><span class="lbl">팀</span></div>
   </div>
-  <div style="padding:0 14px 12px;">
-  <button class="btn btn-primary btn-block"
-    onclick="openNoticeFromToday()">
-    선택한 팀 공지 보기
-  </button>
-</div>
   <main id="storeList"></main>
 </section>
 
-<!-- ════════ 팀별 카카오톡 공지 ════════ -->
-<section class="view" id="view-teamnotice">
-  <main>
-    <div class="panel">
-      <h3>팀별 출근 안내</h3>
-      <div class="hint" style="margin-bottom:14px;">
-        팀을 선택하고 안내문을 복사해 카카오톡에 붙여넣으세요.
-      </div>
-
-      <div class="seg" id="noticeTeamChips"
-           style="margin-bottom:14px;">
-        <button class="on" onclick="selectNoticeTeam(1)">1팀</button>
-        <button onclick="selectNoticeTeam(2)">2팀</button>
-        <button onclick="selectNoticeTeam(3)">3팀</button>
-        <button onclick="selectNoticeTeam(4)">4팀</button>
-      </div>
-
-      <div class="field">
-        <label>카카오톡 공지 내용</label>
-        <textarea id="teamNoticeText"
-          rows="16"
-          style="min-height:360px; white-space:pre-wrap;"
-          readonly></textarea>
-      </div>
-
-      <button class="btn btn-kakao btn-block"
-        onclick="copyTeamNotice()">
-        선택한 팀 안내문 복사
-      </button>
-
-      <button class="btn btn-ghost btn-block"
-        style="margin-top:9px;"
-        onclick="shareTeamNotice()">
-        선택한 팀 안내문 공유
-      </button>
-
-      <button class="btn btn-ghost btn-block"
-        style="margin-top:9px;"
-        onclick="copyAllTeamNotices()">
-        1~4팀 전체 안내문 복사
-      </button>
-    </div>
-  </main>
-</section>
-  
 <!-- ════════ 마감재고 ════════ -->
 <section class="view" id="view-inventory">
   <main>
@@ -362,7 +311,7 @@
         <button id="noonEnd" onclick="setNoonAmPm('마감')">마감</button>
       </div>
       <div id="joinTeamRow" style="display:none; margin-bottom:12px;">
-        <label style="font-size:12px; font-weight:700; color:var(--txt-dim); display:block; margin-bottom:6px;">합류팀 <span style="color:var(--txt-faint); font-weight:500;">(비우면 합류 줄 안 나감)</span></label>
+        <label style="font-size:12px; font-weight:700; color:var(--txt-dim); display:block; margin-bottom:6px;">합류팀 <span style="color:var(--txt-faint); font-weight:500;">(오전 · 비우면 합류 줄 안 나감)</span></label>
         <input type="text" id="joinTeam" placeholder="예) 2팀" oninput="saveJoinTeam()">
       </div>
       <div style="display:flex; gap:9px; margin-bottom:12px;" id="invTeamRow">
@@ -607,7 +556,7 @@
       <p>입력한 일정·보고 내용을 모두 지웁니다. (API 키는 유지)</p>
       <button class="btn btn-ghost btn-block" onclick="wipeData()">전체 일정 삭제</button>
     </div>
-    <div style="text-align:center; color:var(--txt-faint); font-size:11px; padding:6px 0 10px;" class="mono">ploom-report · build 0663</div>
+    <div style="text-align:center; color:var(--txt-faint); font-size:11px; padding:6px 0 10px;" class="mono">ploom-report · build 0662</div>
   </main>
 </section>
 
@@ -770,17 +719,6 @@
   <button class="on" data-view="today" onclick="switchView('today')">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M12 3v18" opacity="0"/><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/></svg>
     오늘
-    <button data-view="teamnotice"
-  onclick="switchView('teamnotice')">
-  <svg viewBox="0 0 24 24" fill="none"
-    stroke="currentColor" stroke-width="2">
-    <circle cx="9" cy="8" r="3"/>
-    <path d="M3 20v-1a6 6 0 0 1 12 0v1
-      M16 5.5a3 3 0 0 1 0 5.8
-      M18 14a5 5 0 0 1 3 4.6V20"/>
-  </svg>
-  팀 공지
-</button>
   </button>
   <button data-view="inventory" onclick="switchView('inventory')">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="18" rx="2"/><path d="M8 3v18M2 9h20M2 15h20"/></svg>
@@ -1338,12 +1276,6 @@ function card(v, defMode){
       ${v.group?`<span class="tag" style="background:rgba(255,107,92,.14); color:var(--coral);">${esc(v.group)}</span>`:''}
     </div>
     ${v.addr?`<div class="addr">${esc(v.addr)} ${naver}</div>`:''}
-    <div style="padding:10px 0 2px;">
-  <button class="btn btn-primary btn-block"
-    onclick="event.stopPropagation(); openNoticeFromStore('${v.id}')">
-    팀 공지에 담기 →
-  </button>
-</div>
   </div>`;
 }
 
@@ -2162,7 +2094,7 @@ function setInvMode(m){
   if(amPmRow) amPmRow.style.display = (m==='noon')?'flex':'none';
   // 합류팀 칸: 오후 모드 + 오전 선택일 때만
   const jr=document.getElementById('joinTeamRow');
-  if(jr) jr.style.display = (m==='noon' && (noonAmPm==='오전'||noonAmPm==='오후'))?'block':'none';
+  if(jr) jr.style.display = (m==='noon' && noonAmPm==='오전')?'block':'none';
   if(m==='noon'){ const jt=document.getElementById('joinTeam'); if(jt) jt.value=localStorage.getItem('ploomJoinTeam')||''; }
   if(m==='move') loadMoveFields();
   if(m==='total_report'){ pullInvIntoTR(false); loadTR_fields(); }
@@ -2618,11 +2550,13 @@ function invText(){
   if(invMode==='noon'){
     if(noonAmPm==='마감') return team ? `${team} 세일즈 종료했습니다.` : '세일즈 종료했습니다.';
     const head = team ? `${team} ${noonAmPm} 세일즈 시작했습니다.` : `${noonAmPm} 세일즈 시작했습니다.`;
-    // 오전·오후: '수퍼바이저 {이름} {합류팀}팀 합류' 줄 추가 (합류팀 있을 때만)
-    const join=(document.getElementById('joinTeam')||{}).value||'';
-    if(name && join.trim()){
-      const jt=join.trim().replace(/팀$/,'');   // '2팀' 입력해도 '2'만 남겨 중복 방지
-      return `${head}\n수퍼바이저 ${name} ${jt}팀 합류`;
+    // 오전: '수퍼바이저 {이름} {합류팀}팀 합류' 줄 추가 (합류팀 있을 때만)
+    if(noonAmPm==='오전'){
+      const join=(document.getElementById('joinTeam')||{}).value||'';
+      if(name && join.trim()){
+        const jt=join.trim().replace(/팀$/,'');   // '2팀' 입력해도 '2'만 남겨 중복 방지
+        return `${head}\n수퍼바이저 ${name} ${jt}팀 합류`;
+      }
     }
     return head;
   }
@@ -2695,146 +2629,6 @@ async function shareInv(){
 }
 
 /* ═══════════ 탭 + 토스트 ═══════════ */
-  /* ═══════════ 팀별 카카오톡 공지 ═══════════ */
-
-const TEAM_NOTICES = {
-  1: `1팀
-[점포]
-10:00 집결- 1팀
-
-출근장소 : 서울 영등포구 문래동 6가 19 (영등포구), 세븐일레븐 문래sk점
-
-세일즈 폼즈 점포 : 현장 출근 후 [세븐일레븐 문래sk점]방문하여 동의얻고 해당 점포로 보고 및 폼즈작성 요망.
-(실시간 세일즈폼즈 작성시 참고)
-
-(물자 수령 후 10:50까지  셋팅 완료 후 출근보고.)`,
-
-  2: `2팀
-[점포]
-10:00 집결 2팀
-
-출근장소 : 서울 영등포구 경인로775 (영등포구), gs25 문래에이스점
-
-세일즈 폼즈 점포 : 현장 출근 후 [gs25 문래에이스점]방문하여 동의얻고 해당 점포로 보고 및 폼즈작성 요망.
-(실시간 세일즈폼즈 작성시 참고)
-
-(물자 수령 후 10:50까지  셋팅 완료 후 출근보고.)`,
-
-  3: `[흡연구역]
-3팀
-[흡연구역]
-10:30집결 - 3팀
-
-출근장소 : 서울 영등포구 선유동2로 64 (영등포구), cu 당산sk점
-
-세일즈 폼즈 점포 : 현장 출근 후 [cu 당산sk점]방문하여 동의얻고 해당 점포로 보고 및 폼즈작성 요망.
-(실시간 세일즈폼즈 작성시 참고)
-
-(물자 수령 후 10:50까지  셋팅 완료 후 출근보고.)`,
-
-  4: `[흡연구역]
-10:30집결 - 4팀
-
-출근장소 : 영등포구문래동3가 83-2 (영등포구), cu문래벤처점
-
-세일즈 폼즈 점포 : 현장 출근 후 [cu문래벤처점]방문하여 동의얻고 해당 점포로 보고 및 폼즈작성 요망.
-(실시간 세일즈폼즈 작성시 참고)
-
-(물자 수령 후 10:50까지  셋팅 완료 후 출근보고.)`
-};
-
-let selectedNoticeTeam = 1;
-  function openNoticeFromToday() {
-function openNoticeFromStore(id) {
-  const v = DATA[id];
-  if (!v) {
-    toast('매장 정보를 찾을 수 없어요.');
-    return;
-  }
-  const match = String(v.team || '').match(/\d+/);
-  const team = match ? Number(match[0]) : 0;
-  if (![1, 2, 3, 4].includes(team)) {
-    toast('현재 1~4팀 공지만 지원해요.');
-    return;
-  }
-  const type =
-    (v.type || '').includes('흡연') || team >= 3
-      ? '흡연구역'
-      : '점포';
-  const time = team >= 3 ? '10:30' : '10:00';
-  const store = v.store || '점포명 미입력';
-  const address = v.addr || '주소 미입력';
-  const notice = `${team}팀
-[${type}]
-${time} 집결 - ${team}팀
-출근장소 : ${address}, ${store}
-세일즈 폼즈 점포 : 현장 출근 후 [${store}] 방문하여 동의 얻고 해당 점포로 보고 및 폼즈 작성 요망.
-(실시간 세일즈폼즈 작성 시 참고)
-(물자 수령 후 10:50까지 셋팅 완료 후 출근보고.)`;
-  selectedNoticeTeam = team;
-  switchView('teamnotice');
-  document.getElementById('teamNoticeText').value = notice;
-  document.querySelectorAll('#noticeTeamChips button')
-    .forEach((button, index) => {
-      button.classList.toggle('on', index + 1 === team);
-    });
-}
-function selectNoticeTeam(team) {
-  selectedNoticeTeam = team;
-
-  document.querySelectorAll('#noticeTeamChips button')
-    .forEach((button, index) => {
-      button.classList.toggle('on', index + 1 === team);
-    });
-
-  document.getElementById('teamNoticeText').value =
-    TEAM_NOTICES[team];
-}
-
-async function copyTextFallback(text) {
-  try {
-    await navigator.clipboard.writeText(text);
-  } catch (e) {
-    const textarea = document.createElement('textarea');
-    textarea.value = text;
-    textarea.style.position = 'fixed';
-    textarea.style.opacity = '0';
-    document.body.appendChild(textarea);
-    textarea.select();
-    document.execCommand('copy');
-    textarea.remove();
-  }
-
-  toast('안내문을 복사했어요. 카카오톡에 붙여넣으세요.');
-}
-
-function copyTeamNotice() {
-  const text = document.getElementById('teamNoticeText').value;
-  copyTextFallback(text);
-}
-async function shareTeamNotice() {
-  const text = document.getElementById('teamNoticeText').value;
-
-  try {
-    if (navigator.share) {
-      await navigator.share({ text });
-    } else {
-      await copyTextFallback(text);
-    }
-  } catch (e) {
-    if (e && e.name !== 'AbortError') {
-      await copyTextFallback(text);
-    }
-  }
-}
-  
-function copyAllTeamNotices() {
-  const text = [1, 2, 3, 4]
-    .map(team => TEAM_NOTICES[team])
-    .join('\\n\\n--------------------------------------------\\n\\n');
-
-  copyTextFallback(text);
-}
 function switchView(v){
   document.querySelectorAll('.view').forEach(s=>s.classList.remove('on'));
   document.getElementById('view-'+v).classList.add('on');
