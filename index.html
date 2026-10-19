@@ -2677,4 +2677,47 @@ window.addEventListener('DOMContentLoaded',()=>{
 });
 </script>
 </body>
+  <script>
+(function () {
+  let startY = 0;
+  let startX = 0;
+  let pulling = false;
+
+  document.addEventListener('touchstart', function (e) {
+    if (e.touches.length !== 1) return;
+
+    const scrollTop =
+      document.documentElement.scrollTop ||
+      document.body.scrollTop ||
+      window.scrollY;
+
+    // 화면이 맨 위에 있을 때만 시작
+    if (scrollTop <= 0) {
+      startY = e.touches[0].clientY;
+      startX = e.touches[0].clientX;
+      pulling = true;
+    } else {
+      pulling = false;
+    }
+  }, { passive: true });
+
+  document.addEventListener('touchend', function (e) {
+    if (!pulling || !e.changedTouches.length) return;
+
+    const endY = e.changedTouches[0].clientY;
+    const endX = e.changedTouches[0].clientX;
+
+    const pullDistance = endY - startY;
+    const horizontalDistance = Math.abs(endX - startX);
+
+    // 아래로 120px 이상 당겼을 때 새로고침
+    if (pullDistance >= 120 &&
+        pullDistance > horizontalDistance * 1.5) {
+      window.location.reload();
+    }
+
+    pulling = false;
+  }, { passive: true });
+})();
+</script>
 </html>
