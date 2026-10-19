@@ -288,78 +288,8 @@
     </div>
     <div class="filter-row" id="teamChips"><span class="lbl">팀</span></div>
   </div>
-  
-<!-- 팀별 출근 안내 추가 -->
-<div id="teamNoticePanel" style="margin:12px; padding:16px; border:1px solid #444; border-radius:12px;">
-  <h3 style="margin:0 0 12px;">팀별 출근 안내</h3>
-
-  <label for="teamNoticeStore">오늘 매장 선택</label>
-  <select id="teamNoticeStore"
-    onchange="teamNoticeSelectedId=this.value; renderTeamNoticePreview();"
-    style="display:block; width:100%; padding:10px; margin:8px 0 12px;">
-  </select>
-
-  <div style="margin-bottom:12px;">
-    <button type="button" onclick="setTeamNoticeTime('10:00')">10:00 출근</button>
-    <button type="button" onclick="setTeamNoticeTime('10:30')">10:30 출근</button>
-  </div>
-
-  <pre id="teamNoticePreview" style="white-space:pre-wrap; overflow-wrap:anywhere; font:inherit;"></pre>
-
-  <button type="button" onclick="copyTeamNotice()"
-    style="width:100%; padding:12px; margin-top:8px;">
-    안내문 복사
-  </button>
-</div>
-<!-- 팀별 출근 안내 끝 -->
-
-<main id="storeList"></main>
-
   <main id="storeList"></main>
 </section>
-
-<!-- ════════ 출근 안내 ════════ -->
-<section class="view" id="view-arrival">
-  <main>
-    <div class="panel">
-      <h3>출근 안내 작성</h3>
-      <p>사전방문 일정에서 매장을 선택해 안내문을 모아 복사하세요.</p>
-
-      <label for="arrivalStore">매장 선택</label>
-      <select id="arrivalStore"
-        style="width:100%;padding:12px;margin:8px 0 12px;background:var(--surface);color:var(--txt);border:1px solid var(--line);border-radius:10px;">
-      </select>
-
-      <div class="opts" style="margin-bottom:14px;">
-        <button class="opt on" id="arrivalTime1000"
-          onclick="setArrivalTime('10:00')">10:00 출근</button>
-        <button class="opt" id="arrivalTime1030"
-          onclick="setArrivalTime('10:30')">10:30 출근</button>
-      </div>
-
-      <button class="btn btn-primary btn-block"
-        onclick="addArrivalStore()">＋ 매장 추가</button>
-    </div>
-
-    <div class="panel">
-      <h3>추가한 매장 <span id="arrivalCount">0</span></h3>
-      <div id="arrivalQueue"></div>
-      <button class="btn btn-ghost btn-block"
-        onclick="clearArrivalQueue()" style="margin-top:10px;">목록 비우기</button>
-    </div>
-
-    <div class="panel">
-      <h3>전체 안내문 미리보기</h3>
-      <textarea id="arrivalPreview" readonly
-        style="min-height:220px;"></textarea>
-      <button class="btn btn-primary btn-block"
-        onclick="copyArrivalAll()" style="margin-top:10px;">
-        전체 안내문 복사
-      </button>
-    </div>
-  </main>
-</section>
-<!-- ════════ 출근 안내 끝 ════════ -->
 
 <!-- ════════ 마감재고 ════════ -->
 <section class="view" id="view-inventory">
@@ -795,14 +725,6 @@
     보고
   </button>
   <button data-view="schedule" onclick="switchView('schedule')">
-<button data-view="arrival" onclick="switchView('arrival')">
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-    <path d="M8 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8l-5-5H8z"/>
-    <path d="M14 3v6h6M7 13h10M7 17h10"/>
-  </svg>
-  출근
-</button>
-
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
     일정
   </button>
@@ -1239,136 +1161,6 @@ function normDate(raw){ // "6월 17" → "6.17"
 }
 
 /* ═══════════ 렌더 ═══════════ */
-  
-let arrivalTime = '10:00';
-let arrivalQueue = [];
-
-function setArrivalTime(time) {
-  if (time !== '10:00' && time !== '10:30') return;
-  arrivalTime = time;
-
-  document.getElementById('arrivalTime1000')
-    .classList.toggle('on', time === '10:00');
-  document.getElementById('arrivalTime1030')
-    .classList.toggle('on', time === '10:30');
-}
-
-function renderArrivalOptions() {
-  const select = document.getElementById('arrivalStore');
-  if (!select) return;
-
-  const list = visits().slice().sort((a, b) =>
-    dateVal(a.dateKey) - dateVal(b.dateKey) ||
-    teamSort(a.team || '', b.team || '')
-  );
-
-  select.innerHTML = list.map(v =>
-    `<option value="${esc(v.id)}">${esc(
-      `${v.dateKey || ''} · ${v.team || '팀 미지정'} · ${v.type || '점포'} · ${v.store || '매장명 없음'}`
-    )}</option>`
-  ).join('');
-
-  if (!list.length) {
-    select.innerHTML = '<option value="">먼저 일정에 매장을 등록하세요</option>';
-  }
-}
-
-function addArrivalStore() {
-  const id = document.getElementById('arrivalStore').value;
-  const v = visits().find(item => String(item.id) === id);
-
-  if (!v) {
-    toast('추가할 매장이 없어요.');
-    return;
-  }
-
-  // 같은 매장은 중복 추가하지 않음
-  if (arrivalQueue.some(item => item.id === id)) {
-    toast('이미 추가한 매장이에요.');
-    return;
-  }
-
-  arrivalQueue.push({
-    id: id,
-    time: arrivalTime
-  });
-
-  renderArrivalQueue();
-}
-
-function removeArrivalStore(id) {
-  arrivalQueue = arrivalQueue.filter(item => item.id !== id);
-  renderArrivalQueue();
-}
-
-function clearArrivalQueue() {
-  arrivalQueue = [];
-  renderArrivalQueue();
-}
-
-function makeArrivalText(item) {
-  const v = visits().find(store => String(store.id) === item.id);
-  if (!v) return '';
-
-  return `📣 ${v.team || '팀 미지정'} 출근 안내
-구분: ${v.type || '점포'}
-출근시간: ${item.time}
-출근장소: ${v.addr || '주소 미등록'} (${v.store || '매장명 없음'})
-
-세일즈 폼즈 점포: 현장 출근 후 [${v.store || '매장명 없음'}] 방문하여 동의를 얻고, 해당 점포로 보고 및 폼즈 작성 요망.
-(실시간 세일즈폼즈 작성 시 참고)
-
-물자 수령 후 10:50까지 셋팅 완료 후 출근보고.`;
-}
-
-function renderArrivalQueue() {
-  const queue = document.getElementById('arrivalQueue');
-  const count = document.getElementById('arrivalCount');
-  const preview = document.getElementById('arrivalPreview');
-  if (!queue || !count || !preview) return;
-
-  count.textContent = arrivalQueue.length;
-
-  queue.innerHTML = arrivalQueue.map(item => {
-    const v = visits().find(store => String(store.id) === item.id);
-    if (!v) return '';
-
-    return `<div style="padding:12px 0;border-bottom:1px solid var(--line);">
-      <b>${esc(v.team || '')} · ${esc(v.store || '')}</b>
-      <div style="color:var(--txt-dim);font-size:13px;">
-        ${esc(v.type || '점포')} · ${esc(item.time)}
-      </div>
-      <button class="opt" onclick="removeArrivalStore('${esc(item.id)}')"
-        style="margin-top:8px;">삭제</button>
-    </div>`;
-  }).join('');
-
-  preview.value = arrivalQueue
-    .map(makeArrivalText)
-    .filter(Boolean)
-    .join('\n\n────────────────\n\n');
-}
-
-async function copyArrivalAll() {
-  const text = document.getElementById('arrivalPreview').value;
-
-  if (!text.trim()) {
-    toast('먼저 매장을 추가해 주세요.');
-    return;
-  }
-
-  try {
-    await navigator.clipboard.writeText(text);
-    toast('전체 출근 안내를 복사했어요.');
-  } catch (err) {
-    const area = document.getElementById('arrivalPreview');
-    area.focus();
-    area.select();
-    const ok = document.execCommand('copy');
-    toast(ok ? '전체 출근 안내를 복사했어요.' : '복사에 실패했어요. 안내문을 길게 눌러 복사해 주세요.');
-  }
-}
-
 function renderAll(){ renderFilters(); renderStoreList(); renderSchedule(); }
 
 function uniq(arr){ return [...new Set(arr)]; }
@@ -1425,95 +1217,6 @@ function setFilter(target,val){
 
 function statusOf(v){ const r=v.report; if(!r||!r.status) return ''; return r.status; }
 
-let teamNoticeTime = '10:00';
-let teamNoticeSelectedId = '';
-
-function setTeamNoticeTime(time) {
-  if (time !== '10:00' && time !== '10:30') return;
-  teamNoticeTime = time;
-  renderTeamNoticePreview();
-}
-
-function renderTeamNoticeOptions(list) {
-  const select = document.getElementById('teamNoticeStore');
-  if (!select) return;
-
-  const previousId = select.value || teamNoticeSelectedId;
-
-  select.innerHTML = list.map(v =>
-    `<option value="${esc(String(v.id || ''))}">${esc((v.team || '팀 미지정') + ' · ' + (v.type || '점포') + ' · ' + (v.store || '매장 미지정'))}</option>`
-  ).join('');
-
-  if (list.length === 0) {
-    select.innerHTML = '<option value="">선택 가능한 매장이 없습니다</option>';
-    teamNoticeSelectedId = '';
-    renderTeamNoticePreview();
-    return;
-  }
-
-  const stillExists = list.some(v => String(v.id) === previousId);
-  teamNoticeSelectedId = stillExists ? previousId : String(list[0].id);
-  select.value = teamNoticeSelectedId;
-
-  renderTeamNoticePreview();
-}
-
-function getTeamNoticeText() {
-  const v = visits().find(
-    item => String(item.id) === teamNoticeSelectedId
-  );
-
-  if (!v) return '먼저 매장을 선택해 주세요.';
-
-  const team = v.team || '팀 미지정';
-  const type = v.type || '점포';
-  const store = v.store || '매장 미지정';
-  const addr = v.addr || '주소 확인 필요';
-
-  return `📣 ${team} 출근 안내
-구분: ${type}
-출근시간: ${teamNoticeTime}
-출근장소: ${addr} (${store})
-
-세일즈 폼즈 점포: 현장 출근 후 [${store}] 방문하여 동의를 얻고, 해당 점포로 보고 및 폼즈 작성 요망.
-(실시간 세일즈폼즈 작성 시 참고)
-
-물자 수령 후 10:50까지 셋팅 완료 후 출근보고.`;
-}
-
-function renderTeamNoticePreview() {
-  const preview = document.getElementById('teamNoticePreview');
-  if (preview) preview.textContent = getTeamNoticeText();
-}
-
-async function copyTeamNotice() {
-  const text = getTeamNoticeText();
-
-  if (!teamNoticeSelectedId) {
-    if (typeof toast === 'function') toast('먼저 매장을 선택해 주세요.');
-    return;
-  }
-
-  try {
-    await navigator.clipboard.writeText(text);
-    if (typeof toast === 'function') toast('출근 안내를 복사했어요.');
-  } catch (err) {
-    const textarea = document.createElement('textarea');
-    textarea.value = text;
-    textarea.style.position = 'fixed';
-    textarea.style.opacity = '0';
-    document.body.appendChild(textarea);
-    textarea.select();
-
-    const copied = document.execCommand('copy');
-    textarea.remove();
-
-    if (typeof toast === 'function') {
-      toast(copied ? '출근 안내를 복사했어요.' : '복사에 실패했어요. 안내문을 길게 눌러 복사해 주세요.');
-    }
-  }
-}
-
 function renderStoreList(){
   const el=document.getElementById('storeList');
   const today=todayKey();
@@ -1529,8 +1232,6 @@ function renderStoreList(){
   else if(filterDate!=='전체') vs=vs.filter(v=>v.dateKey===filterDate);
   else if(!showPast) vs=vs.filter(v=>!isPast(v.dateKey));
   if(filterTeam!=='전체') vs=vs.filter(v=>v.team===filterTeam);
-  renderTeamNoticeOptions(vs);
-  
   if(visits().length===0){
     el.innerHTML='<div class="empty"><b>아직 일정이 없어요</b>일정 탭에서 이번 달 엑셀을 넣어 시작하세요.<br><button class="btn btn-primary" onclick="switchView(\'schedule\')">일정 넣으러 가기</button></div>';
     return;
@@ -2938,10 +2639,6 @@ function toast(msg){
   const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show');
   clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('show'),2000);
 }
-  if (v === 'arrival') {
-  renderArrivalOptions();
-  renderArrivalQueue();
-}
 
 /* ═══════════ 시작 ═══════════ */
 // 앱을 백그라운드로 보내거나 닫을 때 즉시 저장 (유실 방지)
@@ -2980,47 +2677,4 @@ window.addEventListener('DOMContentLoaded',()=>{
 });
 </script>
 </body>
-  <script>
-(function () {
-  let startY = 0;
-  let startX = 0;
-  let pulling = false;
-
-  document.addEventListener('touchstart', function (e) {
-    if (e.touches.length !== 1) return;
-
-    const scrollTop =
-      document.documentElement.scrollTop ||
-      document.body.scrollTop ||
-      window.scrollY;
-
-    // 화면이 맨 위에 있을 때만 시작
-    if (scrollTop <= 0) {
-      startY = e.touches[0].clientY;
-      startX = e.touches[0].clientX;
-      pulling = true;
-    } else {
-      pulling = false;
-    }
-  }, { passive: true });
-
-  document.addEventListener('touchend', function (e) {
-    if (!pulling || !e.changedTouches.length) return;
-
-    const endY = e.changedTouches[0].clientY;
-    const endX = e.changedTouches[0].clientX;
-
-    const pullDistance = endY - startY;
-    const horizontalDistance = Math.abs(endX - startX);
-
-    // 아래로 120px 이상 당겼을 때 새로고침
-    if (pullDistance >= 120 &&
-        pullDistance > horizontalDistance * 1.5) {
-      window.location.reload();
-    }
-
-    pulling = false;
-  }, { passive: true });
-})();
-</script>
 </html>
