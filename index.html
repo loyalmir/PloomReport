@@ -288,6 +288,33 @@
     </div>
     <div class="filter-row" id="teamChips"><span class="lbl">팀</span></div>
   </div>
+  
+<!-- 팀별 출근 안내 추가 -->
+<div id="teamNoticePanel" style="margin:12px; padding:16px; border:1px solid #444; border-radius:12px;">
+  <h3 style="margin:0 0 12px;">팀별 출근 안내</h3>
+
+  <label for="teamNoticeStore">오늘 매장 선택</label>
+  <select id="teamNoticeStore"
+    onchange="teamNoticeSelectedId=this.value; renderTeamNoticePreview();"
+    style="display:block; width:100%; padding:10px; margin:8px 0 12px;">
+  </select>
+
+  <div style="margin-bottom:12px;">
+    <button type="button" onclick="setTeamNoticeTime('10:00')">10:00 출근</button>
+    <button type="button" onclick="setTeamNoticeTime('10:30')">10:30 출근</button>
+  </div>
+
+  <pre id="teamNoticePreview" style="white-space:pre-wrap; overflow-wrap:anywhere; font:inherit;"></pre>
+
+  <button type="button" onclick="copyTeamNotice()"
+    style="width:100%; padding:12px; margin-top:8px;">
+    안내문 복사
+  </button>
+</div>
+<!-- 팀별 출근 안내 끝 -->
+
+<main id="storeList"></main>
+
   <main id="storeList"></main>
 </section>
 
@@ -1217,6 +1244,95 @@ function setFilter(target,val){
 
 function statusOf(v){ const r=v.report; if(!r||!r.status) return ''; return r.status; }
 
+let teamNoticeTime = '10:00';
+let teamNoticeSelectedId = '';
+
+function setTeamNoticeTime(time) {
+  if (time !== '10:00' && time !== '10:30') return;
+  teamNoticeTime = time;
+  renderTeamNoticePreview();
+}
+
+function renderTeamNoticeOptions(list) {
+  const select = document.getElementById('teamNoticeStore');
+  if (!select) return;
+
+  const previousId = select.value || teamNoticeSelectedId;
+
+  select.innerHTML = list.map(v =>
+    `<option value="${esc(String(v.id || ''))}">${esc((v.team || '팀 미지정') + ' · ' + (v.type || '점포') + ' · ' + (v.store || '매장 미지정'))}</option>`
+  ).join('');
+
+  if (list.length === 0) {
+    select.innerHTML = '<option value="">선택 가능한 매장이 없습니다</option>';
+    teamNoticeSelectedId = '';
+    renderTeamNoticePreview();
+    return;
+  }
+
+  const stillExists = list.some(v => String(v.id) === previousId);
+  teamNoticeSelectedId = stillExists ? previousId : String(list[0].id);
+  select.value = teamNoticeSelectedId;
+
+  renderTeamNoticePreview();
+}
+
+function getTeamNoticeText() {
+  const v = visits().find(
+    item => String(item.id) === teamNoticeSelectedId
+  );
+
+  if (!v) return '먼저 매장을 선택해 주세요.';
+
+  const team = v.team || '팀 미지정';
+  const type = v.type || '점포';
+  const store = v.store || '매장 미지정';
+  const addr = v.addr || '주소 확인 필요';
+
+  return `📣 ${team} 출근 안내
+구분: ${type}
+출근시간: ${teamNoticeTime}
+출근장소: ${addr} (${store})
+
+세일즈 폼즈 점포: 현장 출근 후 [${store}] 방문하여 동의를 얻고, 해당 점포로 보고 및 폼즈 작성 요망.
+(실시간 세일즈폼즈 작성 시 참고)
+
+물자 수령 후 10:50까지 셋팅 완료 후 출근보고.`;
+}
+
+function renderTeamNoticePreview() {
+  const preview = document.getElementById('teamNoticePreview');
+  if (preview) preview.textContent = getTeamNoticeText();
+}
+
+async function copyTeamNotice() {
+  const text = getTeamNoticeText();
+
+  if (!teamNoticeSelectedId) {
+    if (typeof toast === 'function') toast('먼저 매장을 선택해 주세요.');
+    return;
+  }
+
+  try {
+    await navigator.clipboard.writeText(text);
+    if (typeof toast === 'function') toast('출근 안내를 복사했어요.');
+  } catch (err) {
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.style.position = 'fixed';
+    textarea.style.opacity = '0';
+    document.body.appendChild(textarea);
+    textarea.select();
+
+    const copied = document.execCommand('copy');
+    textarea.remove();
+
+    if (typeof toast === 'function') {
+      toast(copied ? '출근 안내를 복사했어요.' : '복사에 실패했어요. 안내문을 길게 눌러 복사해 주세요.');
+    }
+  }
+}
+
 function renderStoreList(){
   const el=document.getElementById('storeList');
   const today=todayKey();
@@ -1232,6 +1348,8 @@ function renderStoreList(){
   else if(filterDate!=='전체') vs=vs.filter(v=>v.dateKey===filterDate);
   else if(!showPast) vs=vs.filter(v=>!isPast(v.dateKey));
   if(filterTeam!=='전체') vs=vs.filter(v=>v.team===filterTeam);
+  renderTeamNoticeOptions(vs);
+  
   if(visits().length===0){
     el.innerHTML='<div class="empty"><b>아직 일정이 없어요</b>일정 탭에서 이번 달 엑셀을 넣어 시작하세요.<br><button class="btn btn-primary" onclick="switchView(\'schedule\')">일정 넣으러 가기</button></div>';
     return;
