@@ -304,6 +304,7 @@
         <button id="invSegTotal" onclick="setInvMode('total_report')">총보고</button>
         <button id="invSegCond" onclick="setInvMode('cond')">컨디션</button>
         <button id="invSegTemp" onclick="setInvMode('temp')">기온</button>
+        <button id="invSegArrive" onclick="setInvMode('arrive')">출근</button>
       </div>
       <div class="seg" id="noonAmPmRow" style="display:none; margin-bottom:12px;">
         <button id="noonAm" onclick="setNoonAmPm('오전')">오전</button>
@@ -397,6 +398,13 @@
       </div>
       <div id="tempBlocks"></div>
       <button class="btn btn-ghost btn-block" onclick="addTempBlock()" style="margin-top:6px;">+ 지역 추가</button>
+    </div>
+    <div class="panel" id="invArrivePanel" style="display:none;">
+      <h3>출근 안내</h3>
+      <p>매장에서 <b>🚩 출근</b>으로 담거나 직접 추가하세요. 여러 매장을 담고 한 번에 복사됩니다.</p>
+      <div id="arriveBlocks"></div>
+      <button class="btn btn-ghost btn-block" onclick="addArriveBlock()" style="margin-top:6px;">+ 매장 추가</button>
+      <button class="btn btn-ghost btn-block" onclick="clearArrive()" style="margin-top:9px;">전체 비우기</button>
     </div>
     <div class="panel" id="invItemsPanel">
       <h3>재고 항목</h3>
@@ -556,7 +564,7 @@
       <p>입력한 일정·보고 내용을 모두 지웁니다. (API 키는 유지)</p>
       <button class="btn btn-ghost btn-block" onclick="wipeData()">전체 일정 삭제</button>
     </div>
-    <div style="text-align:center; color:var(--txt-faint); font-size:11px; padding:6px 0 10px;" class="mono">ploom-report · build 0662</div>
+    <div style="text-align:center; color:var(--txt-faint); font-size:11px; padding:6px 0 10px;" class="mono">ploom-report · build 0664</div>
   </main>
 </section>
 
@@ -571,6 +579,7 @@
       <button class="code-btn" id="codeBtn" style="display:none;" onclick="copyStoreCode()"><span id="codeBtnText">—</span> 탭하여 복사</button>
       <button class="code-btn" id="ownerMsgBtn" onclick="openOwnerMsg()" style="border-color:var(--kakao); color:var(--kakao);">✉️ 문자</button>
       <button class="code-btn" onclick="openMovePick()" style="border-color:var(--coral); color:var(--coral);">📍 이동</button>
+      <button class="code-btn" onclick="addArriveFromStore()" style="border-color:var(--blue); color:var(--blue);">🚩 출근</button>
       <button class="code-btn" onclick="openStoreEdit()" style="border-color:var(--green); color:var(--green);">✏️ 수정</button>
       <button class="code-btn" onclick="delCurrentVisit()" style="border-color:var(--coral); color:var(--coral);">🗑 삭제</button>
     </div>
@@ -2075,21 +2084,24 @@ function setInvMode(m){
   document.getElementById('invSegTotal').classList.toggle('on',m==='total_report');
   document.getElementById('invSegCond').classList.toggle('on',m==='cond');
   document.getElementById('invSegTemp').classList.toggle('on',m==='temp');
+  document.getElementById('invSegArrive').classList.toggle('on',m==='arrive');
   const itemsPanel=document.getElementById('invItemsPanel');
   const repToggle=document.getElementById('invReportToggle');
   const movePanel=document.getElementById('invMovePanel');
   const totalPanel=document.getElementById('invTotalPanel');
   const condPanel=document.getElementById('invCondPanel');
   const tempPanel=document.getElementById('invTempPanel');
+  const arrivePanel=document.getElementById('invArrivePanel');
   const teamRow=document.getElementById('invTeamRow');
-  const hideItems = (m==='noon'||m==='move'||m==='total_report'||m==='cond'||m==='temp');
+  const hideItems = (m==='noon'||m==='move'||m==='total_report'||m==='cond'||m==='temp'||m==='arrive');
   if(itemsPanel) itemsPanel.style.display = hideItems?'none':'';
   if(repToggle) repToggle.style.display = hideItems?'none':'';
   if(movePanel) movePanel.style.display = (m==='move')?'':'none';
   if(totalPanel) totalPanel.style.display = (m==='total_report')?'':'none';
   if(condPanel) condPanel.style.display = (m==='cond')?'':'none';
   if(tempPanel) tempPanel.style.display = (m==='temp')?'':'none';
-  if(teamRow) teamRow.style.display = (m==='move'||m==='total_report'||m==='cond'||m==='temp')?'none':'';
+  if(arrivePanel) arrivePanel.style.display = (m==='arrive')?'':'none';
+  if(teamRow) teamRow.style.display = (m==='move'||m==='total_report'||m==='cond'||m==='temp'||m==='arrive')?'none':'';
   const amPmRow=document.getElementById('noonAmPmRow');
   if(amPmRow) amPmRow.style.display = (m==='noon')?'flex':'none';
   // 합류팀 칸: 오후 모드 + 오전 선택일 때만
@@ -2100,6 +2112,7 @@ function setInvMode(m){
   if(m==='total_report'){ pullInvIntoTR(false); loadTR_fields(); }
   if(m==='cond'){ loadCondFields(); loadCondPhotos(); }
   if(m==='temp') loadTempFields();
+  if(m==='arrive') renderArriveBlocks();
   renderInv();
 }
 function loadMove(){
@@ -2529,6 +2542,83 @@ function renderCondPhotos(){
     w.append(img,x); row.insertBefore(w, add);
   });
 }
+/* ═══════════ 출근 안내 ═══════════ */
+function loadArrive(){
+  try{ const d=JSON.parse(localStorage.getItem('ploomArrive')||'null'); if(d&&Array.isArray(d.blocks)) return d; }catch(e){}
+  return {blocks:[]};
+}
+let ARRIVE=loadArrive(), arriveNextId=Date.now();
+function persistArrive(){ localStorage.setItem('ploomArrive', JSON.stringify(ARRIVE)); renderInv(); }
+function newArriveBlock(o){ o=o||{}; return {id:++arriveNextId, team:o.team||'', gubun:o.gubun||'점포', time:o.time||'10:00', store:o.store||'', addr:o.addr||''}; }
+function addArriveBlock(){ ARRIVE.blocks.push(newArriveBlock()); persistArrive(); renderArriveBlocks(); }
+function delArriveBlock(id){ ARRIVE.blocks=ARRIVE.blocks.filter(x=>x.id!==id); persistArrive(); renderArriveBlocks(); }
+function updArrive(id,field,val){ const b=ARRIVE.blocks.find(x=>x.id===id); if(b){ b[field]=val; persistArrive(); } }
+function setArriveField(id,field,val){ const b=ARRIVE.blocks.find(x=>x.id===id); if(b){ b[field]=val; persistArrive(); renderArriveBlocks(); } }
+function clearArrive(){
+  if(!confirm('출근 안내 목록을 모두 지울까요?')) return;
+  ARRIVE={blocks:[]}; persistArrive(); renderArriveBlocks(); toast('비웠습니다');
+}
+// 매장 편집창에서 현재 매장을 출근 목록에 담기
+function addArriveFromStore(){
+  const v=DATA[curId]; if(!v) return;
+  const gubun = (v.type==='흡연구역')?'흡연구역':'점포';
+  const time = (gubun==='흡연구역')?'10:30':'10:00';   // 흡연구역 기본 10:30, 점포 10:00
+  ARRIVE.blocks.push(newArriveBlock({team:v.team, gubun, time, store:`${v.brand} ${v.store}`.trim(), addr:v.addr||''}));
+  persistArrive();
+  toast(`출근 목록에 추가됨 · ${v.brand} ${v.store}`);
+}
+function renderArriveBlocks(){
+  const el=document.getElementById('arriveBlocks'); if(!el) return; el.innerHTML='';
+  if(!ARRIVE.blocks.length){ el.innerHTML='<div style="color:var(--txt-faint); font-size:13px; padding:4px 2px 10px;">담긴 매장이 없어요. 매장에서 🚩 출근으로 담거나 + 매장 추가를 누르세요.</div>'; return; }
+  ARRIVE.blocks.forEach((b,idx)=>{
+    const wrap=document.createElement('div'); wrap.className='move-block';
+    wrap.innerHTML=`
+      <div class="tb-head">
+        <span style="font-size:12px; font-weight:800; color:var(--txt-dim);">매장 ${idx+1}</span>
+        <button class="mb-del" onclick="delArriveBlock(${b.id})">×</button>
+      </div>
+      <div class="field"><label>팀</label>
+        <input type="text" value="${esc(b.team)}" placeholder="예) 1팀" oninput="updArrive(${b.id},'team',this.value)"></div>
+      <div style="display:flex; gap:9px; margin-bottom:11px;">
+        <div style="flex:1;"><label style="font-size:11px; color:var(--txt-faint); display:block; margin-bottom:5px;">구분</label>
+          <div class="seg" style="margin:0;">
+            <button class="${b.gubun==='점포'?'on':''}" onclick="setArriveField(${b.id},'gubun','점포')">점포</button>
+            <button class="${b.gubun==='흡연구역'?'on':''}" onclick="setArriveField(${b.id},'gubun','흡연구역')">흡연구역</button>
+          </div></div>
+        <div style="flex:1;"><label style="font-size:11px; color:var(--txt-faint); display:block; margin-bottom:5px;">집결 시간</label>
+          <div class="seg" style="margin:0;">
+            <button class="${b.time==='10:00'?'on':''}" onclick="setArriveField(${b.id},'time','10:00')">10:00</button>
+            <button class="${b.time==='10:30'?'on':''}" onclick="setArriveField(${b.id},'time','10:30')">10:30</button>
+          </div></div>
+      </div>
+      <div class="field"><label>매장명 <span style="color:var(--txt-faint); font-weight:500;">(브랜드+매장)</span></label>
+        <input type="text" value="${esc(b.store)}" placeholder="예) 세븐일레븐 문래sk점" oninput="updArrive(${b.id},'store',this.value)"></div>
+      <div class="field" style="margin-bottom:0;"><label>주소</label>
+        <input type="text" value="${esc(b.addr)}" placeholder="예) 서울 영등포구 문래동6가 19" oninput="updArrive(${b.id},'addr',this.value)"></div>`;
+    el.appendChild(wrap);
+  });
+}
+function arriveBlockText(b){
+  const store=(b.store||'').trim();
+  const addr=(b.addr||'').trim();
+  const team=(b.team||'').trim();
+  const lines=[];
+  if(team) lines.push(team);
+  lines.push(`[${b.gubun||'점포'}]`);
+  lines.push(`${b.time||'10:00'} 집결 - ${team}`);
+  lines.push('');
+  lines.push(`출근장소 : ${addr}${addr&&store?', ':''}${store}`);
+  lines.push('');
+  lines.push(`세일즈 폼즈 점포 : 현장 출근 후 [${store}]방문하여 동의얻고 해당 점포로 보고 및 폼즈작성 요망.`);
+  lines.push('(실시간 세일즈폼즈 작성시 참고)');
+  lines.push('');
+  lines.push('(물자 수령 후 10:50까지 셋팅 완료 후 출근보고.)');
+  return lines.join('\n');
+}
+function arriveText(){
+  const sep='\n\n--------------------------------------------\n\n';
+  return ARRIVE.blocks.map(arriveBlockText).join(sep).replace(/\s+$/,'');
+}
 function moveText(){
   const lines=[];
   if(MOVE.title && MOVE.title.trim()){ lines.push(MOVE.title.trim()); lines.push(''); }
@@ -2562,6 +2652,7 @@ function invText(){
   if(invMode==='total_report'){ return trText(); }
   if(invMode==='cond'){ return condText(); }
   if(invMode==='temp'){ return tempText(); }
+  if(invMode==='arrive'){ return arriveText(); }
   const d=new Date(); const date=`${d.getMonth()+1}/${d.getDate()}`;
   const itemLines=[];
   const [fa,fb]=invFields();
@@ -2677,47 +2768,4 @@ window.addEventListener('DOMContentLoaded',()=>{
 });
 </script>
 </body>
-  <script>
-(function () {
-  let startY = 0;
-  let startX = 0;
-  let pulling = false;
-
-  document.addEventListener('touchstart', function (e) {
-    if (e.touches.length !== 1) return;
-
-    const scrollTop =
-      document.documentElement.scrollTop ||
-      document.body.scrollTop ||
-      window.scrollY;
-
-    // 화면이 맨 위에 있을 때만 시작
-    if (scrollTop <= 0) {
-      startY = e.touches[0].clientY;
-      startX = e.touches[0].clientX;
-      pulling = true;
-    } else {
-      pulling = false;
-    }
-  }, { passive: true });
-
-  document.addEventListener('touchend', function (e) {
-    if (!pulling || !e.changedTouches.length) return;
-
-    const endY = e.changedTouches[0].clientY;
-    const endX = e.changedTouches[0].clientX;
-
-    const pullDistance = endY - startY;
-    const horizontalDistance = Math.abs(endX - startX);
-
-    // 아래로 120px 이상 당겼을 때 새로고침
-    if (pullDistance >= 120 &&
-        pullDistance > horizontalDistance * 1.5) {
-      window.location.reload();
-    }
-
-    pulling = false;
-  }, { passive: true });
-})();
-</script>
 </html>
