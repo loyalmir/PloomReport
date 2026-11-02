@@ -805,6 +805,7 @@
 <!-- Firebase (config 비어있으면 미사용) -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 
 <script>
 /* ═══════════ 상태 ═══════════ */
@@ -894,6 +895,7 @@ const Store = {
       this.linkCode=code;
       try{
         if(!firebase.apps.length) firebase.initializeApp(fbConfig);
+        try{ await firebase.auth().signInAnonymously(); }catch(e){ console.warn('익명 로그인 실패',e); }
         this.db=firebase.database(); this.mode='cloud';
         // Firebase가 비어있으면 로컬 데이터를 먼저 올림 (데이터 손실 방지)
         const snap = await this.db.ref(this.path('visits')).once('value');
